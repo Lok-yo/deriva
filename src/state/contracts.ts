@@ -1,0 +1,31 @@
+import type { Session } from '@supabase/supabase-js';
+import type { AppNotification, ConnectionState, Place, Profile, PublishDraft, PurchaseOption } from '../domain/models';
+
+export type AppState = {
+  ready: boolean;
+  session: Session | null;
+  profile: Profile | null;
+  isPreview: boolean;
+  places: Place[];
+  savedIds: string[];
+  notifications: AppNotification[];
+  premium: boolean;
+  connection: ConnectionState;
+  error: string | null;
+  notificationsEnabled: boolean;
+  notificationRadius: number;
+  purchaseOptions: PurchaseOption[];
+  refresh(): Promise<void>;
+  signIn(email: string, password: string): Promise<void>;
+  signUp(name: string, email: string, password: string): Promise<{ needsEmailConfirmation: boolean }>;
+  signOut(): Promise<void>;
+  toggleSaved(id: string): Promise<void>;
+  publish(draft: PublishDraft): Promise<string>;
+  deletePlace(id: string): Promise<void>;
+  markNotificationRead(id: string): Promise<void>;
+  setNotificationPreferences(enabled: boolean, radiusKm: number): Promise<void>;
+  loadPurchaseOptions(): Promise<void>;
+  purchase(identifier: string): Promise<boolean>;
+  restorePurchases(): Promise<boolean>;
+  updateDisplayName(name: string): Promise<void>;
+};
