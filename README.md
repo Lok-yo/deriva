@@ -1,8 +1,28 @@
 # Deriva
 
-Una app React Native + Expo para descubrir y compartir lugares. Android e iOS, interfaz en español, Supabase Auth/Database/Storage/Realtime, compras de las tiendas mediante RevenueCat y notificaciones con Expo Push Service.
+Una app móvil React Native + Expo para descubrir y compartir lugares en Android e iOS. **Para probarla ahora, ábrela en Expo Go desde tu teléfono.**
 
-La implementación y el backend están entregados y verificados. La instalación firmada, los sensores físicos, las compras de sandbox y el push visible siguen pendientes de teléfono y configuración de Expo, RevenueCat y las tiendas; consulta [aceptación](docs/acceptance.md).
+## Abrir en Expo Go
+
+```bash
+cd /home/kiyo/Proyectos/Aurelio/deriva
+npm start
+```
+
+1. Instala [Expo Go](https://expo.dev/go) en Android o iOS, con una versión compatible con el SDK 57 del proyecto.
+2. Conecta el teléfono y este equipo a la misma red Wi-Fi.
+3. Escanea el QR de la terminal: desde Expo Go en Android o con la cámara del iPhone. Se abre Deriva dentro de Expo Go.
+4. Mantén la terminal abierta mientras pruebas la app. No necesitas crear un APK ni configurar EAS para abrirla.
+
+Si la red impide conectar, detén el servidor y usa `npm run start:tunnel` para generar otro QR accesible desde otra red. Si acabas de copiar el proyecto a otro equipo, ejecuta `npm ci` antes de iniciar.
+
+El `.env` local ya contiene la URL y la clave **publishable** del proyecto Supabase conectado. Está excluido de Git. El backend está desplegado y el inicio de sesión se verificó con ese proyecto. El registro está integrado; la confirmación y entrega de correo dependen de los ajustes de Auth. Para otro equipo, copia `.env.example` a `.env` y configura tu proyecto. Sin cuenta se muestran seis ejemplos identificados como vista previa; esos lugares nunca se insertan en la base de datos.
+
+En Expo Go puedes probar la navegación, el mapa, la cuenta, Supabase y Realtime, el GPS y la brújula. La cámara exige biometría real: huella en Android o Touch ID en un iPhone compatible. **Face ID no funciona en Expo Go**, así que un iPhone que solo tenga Face ID podrá explorar, pero no completar la foto protegida. [Limitación oficial de Expo](https://docs.expo.dev/versions/v57.0.0/sdk/local-authentication/).
+
+Deriva mantiene las compras reales y el registro de push desactivados en Expo Go; los avisos recibidos por Realtime se consultan en **Actividad** con la app abierta. La integración de tiendas y push está preparada para una fase posterior con una compilación propia. No se simula una compra ni se omite la biometría. [RevenueCat para Expo](https://www.revenuecat.com/docs/getting-started/installation/expo), [notificaciones en SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
+
+## Funciones
 
 | Función | Gratis | Premium |
 | --- | --- | --- |
@@ -13,19 +33,9 @@ La implementación y el backend están entregados y verificados. La instalación
 
 La cámara, el GPS, el magnetómetro y la autenticación biométrica se usan de forma independiente. La galería no cuenta como uso de cámara. No se almacenan huellas ni imágenes de Face ID; el sistema operativo devuelve el resultado de la autenticación.
 
-## Abrir el proyecto
+## Desarrollo nativo posterior
 
-```bash
-cd /home/kiyo/Proyectos/Aurelio/deriva
-npm ci
-npm run web
-```
-
-El `.env` local ya contiene la URL y la clave **publishable** del proyecto Supabase conectado. Está excluido de Git. El backend está desplegado y el inicio de sesión se verificó con ese proyecto. El registro está integrado; la confirmación y entrega de correo dependen de los ajustes de Auth. Para otro equipo, copia `.env.example` a `.env` y configura tu proyecto. Sin cuenta se muestran seis ejemplos identificados como vista previa; esos lugares nunca se insertan en la base de datos.
-
-La vista web sirve para revisar mapa, navegación y formularios. **Para los cuatro sensores, compras reales y push usa una compilación de desarrollo en un teléfono.** Expo Go puede mostrar la interfaz, pero Deriva bloquea su simulación de compras. [Documentación de RevenueCat para Expo](https://www.revenuecat.com/docs/getting-started/installation/expo).
-
-## Instalar en Android o iOS
+Estos pasos son para probar más adelante Face ID, compras de tienda y push en una compilación propia. No son requisitos para abrir la app en Expo Go.
 
 ```bash
 npx eas-cli@latest login
@@ -37,7 +47,7 @@ Configura `EXPO_PUBLIC_EAS_PROJECT_ID` con el UUID del proyecto. Los identificad
 ```bash
 npx eas-cli@latest build --profile development --platform android
 npx eas-cli@latest build --profile development --platform ios
-npm start
+npm run start:dev-client
 ```
 
 Instala el APK o la compilación iOS y abre el servidor de desarrollo. EAS necesita los permisos y credenciales de tus cuentas para firmar la app. Face ID en iOS requiere la compilación propia y el permiso incluido en la configuración.
@@ -105,7 +115,7 @@ Resultado al 3 de octubre de 2026: **49 pruebas**, TypeScript, ESLint, compatibi
 
 La vista previa web pasó las anchuras 320, 390, 768 y 1440 px sin desbordamientos ni errores de ejecución o consola. El recorrido web con sesión real pasó login, edición de perfil, preferencias, controles de acceso a cámara/compras, inbox y logout sin errores de página. Las dos cuentas, la fotografía y sus datos temporales de prueba se eliminaron; los datos originales de asistencia se conservaron.
 
-La guía de [aceptación en dispositivos](docs/acceptance.md) distingue lo verificado en este equipo de los pasos que necesitan tu teléfono y cuentas de las tiendas. Quedan pendientes el proyecto EAS, las claves/productos RevenueCat, la firma nativa y las credenciales FCM/APNs. Los bundles no equivalen a un APK firmado ni a una prueba de sensores físicos.
+La guía de [aceptación en dispositivos](docs/acceptance.md) distingue lo verificado en este equipo de los pasos que necesitan tu teléfono. La apertura en Expo Go y los sensores físicos aún deben observarse en el dispositivo. Para la fase posterior de tiendas/push quedan pendientes el proyecto EAS, las claves/productos RevenueCat, la firma nativa y las credenciales FCM/APNs. Los bundles no equivalen a una prueba de sensores físicos.
 
 `npm audit` aún informa 23 entradas transitivas: 20 altas y 3 moderadas, derivadas de `braces`, `node-forge` y `decode-uri-component`. Se corrigió `uuid` con una versión compatible; forzar el resto mediante `npm audit fix --force` propone degradaciones incompatibles de Expo/React Native. Revisa actualizaciones compatibles antes de distribuir. El advisor de Supabase informa un WARN por protección de contraseñas filtradas desactivada, una configuración preexistente del Auth compartido que esta app conserva, y cuatro INFO por tablas privadas y cola sin políticas, deliberadamente inaccesibles a usuarios. [Protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection), [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 

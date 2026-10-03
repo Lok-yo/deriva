@@ -22,7 +22,7 @@ export function registerPushToken(expectedUserId: string, options: { requestPerm
     if (!canRegisterPush()) {
       if (!requestPermission) return false;
       if (Platform.OS === 'web') throw new Error('Activa las notificaciones desde Deriva en tu teléfono.');
-      if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) throw new Error('Las notificaciones push necesitan la versión instalada de Deriva.');
+      if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) throw new Error('Expo Go no permite recibir el push de Deriva. Puedes consultar los avisos en Actividad mientras usas la app.');
       if (!Device.isDevice) throw new Error('Activa las notificaciones en un teléfono físico para probar la entrega.');
       throw new Error('Las notificaciones todavía no están disponibles en esta versión.');
     }

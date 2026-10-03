@@ -48,9 +48,11 @@
     "eslint-config-expo": "~57.0.2"
   },
   "scripts": {
-    "start": "expo start --dev-client",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "start": "expo start --go --lan",
+    "start:tunnel": "expo start --go --tunnel",
+    "start:dev-client": "expo start --dev-client --lan",
+    "android": "expo start --go --lan --android",
+    "ios": "expo start --go --lan --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",

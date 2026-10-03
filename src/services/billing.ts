@@ -20,7 +20,7 @@ async function assertSdkIdentity(sdk: PurchasesSdk, session: BillingSession) {
 
 async function purchasesSdk(session: BillingSession) {
   if (Platform.OS === 'web') throw new Error('Las compras están disponibles en la app Android o iOS.');
-  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) throw new Error('Para comprar o restaurar, abre la versión instalada de Deriva. Expo Go permite ver la interfaz.');
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) throw new Error('Las compras reales no están disponibles en Expo Go. Puedes seguir usando el plan gratuito.');
   const apiKey = Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
   if (!apiKey) throw new Error('Las compras todavía no están disponibles. Puedes seguir usando el plan gratuito.');
   const { default: Purchases } = await import('react-native-purchases');

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -6,6 +7,10 @@ import type { Photo } from '../domain/models';
 
 export async function capturePhoto(): Promise<Photo | null> {
   if (Platform.OS === 'web') throw new Error('Toma la foto desde la app en tu teléfono para confirmar tu identidad con huella o Face ID.');
+  if (Platform.OS === 'ios' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+    if (!types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) throw new Error('Face ID no está disponible en Expo Go. Para tomar fotos aquí necesitas un dispositivo con Touch ID; puedes seguir explorando los lugares.');
+  }
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) throw new Error('Permite el acceso a la cámara en Ajustes para tomar la foto.');
   if (!await LocalAuthentication.hasHardwareAsync()) throw new Error('Este teléfono no ofrece autenticación biométrica.');
