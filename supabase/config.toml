@@ -1,0 +1,48 @@
+project_id = "deriva"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+file_size_limit = "2MiB"
+
+[auth]
+enabled = true
+site_url = "deriva://auth/callback"
+additional_redirect_urls = ["deriva://auth/callback", "http://localhost:8081"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# Local development only. Hosted Auth configuration remains unchanged.
+enable_confirmations = false
+
+# Each function verifies its own signed user token or dedicated server secret.
+# Publishable API keys are not JWTs and cannot satisfy the gateway JWT check.
+[functions.deriva-billing-sync]
+verify_jwt = false
+
+[functions.deriva-revenuecat]
+verify_jwt = false
+
+[functions.deriva-push-worker]
+verify_jwt = false
