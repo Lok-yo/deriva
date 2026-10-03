@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import type { Category } from '../domain/models';
-import { useApp } from '../state/AppProvider';
-import { Button } from '../ui/Button';
-import { Notice } from '../ui/Feedback';
-import { Chip, Field } from '../ui/Forms';
-import { LocationPicker } from '../ui/LocationPicker';
-import { Page, PageHeading } from '../ui/Page';
-import { PhotoPicker } from '../ui/PhotoPicker';
-import { categoryIcons, categoryLabels } from '../ui/PlaceRow';
-import { colors, layout, type } from '../ui/theme';
-import { usePublicationForm } from '../ui/usePublicationForm';
+import type { Category } from '../../domain/models';
+import { useApp } from '../../state/AppProvider';
+import { Button } from '../../ui/Button';
+import { Notice } from '../../ui/Feedback';
+import { Chip, Field } from '../../ui/Forms';
+import { LocationPicker } from '../../ui/LocationPicker';
+import { Page, PageHeading } from '../../ui/Page';
+import { PhotoPicker } from '../../ui/PhotoPicker';
+import { categoryIcons, categoryLabels } from '../../ui/PlaceRow';
+import { colors, layout, type } from '../../ui/theme';
+import { usePublicationForm } from '../../ui/usePublicationForm';
 
 export default function Publish() {
   const app = useApp();

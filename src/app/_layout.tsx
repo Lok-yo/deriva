@@ -8,13 +8,17 @@ import { AppShell } from '../ui/AppShell';
 import { Button } from '../ui/Button';
 import { colors, type } from '../ui/theme';
 
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 function Routes() {
   const { ready } = useApp();
   useEffect(() => {
     if (!ready) return;
     return listenForNotificationTaps(id => router.push({ pathname: '/place/[id]', params: { id } }));
   }, [ready]);
-  return <AppShell><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background }, animation: 'slide_from_right' }} /></AppShell>;
+  return <AppShell><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+    <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+  </Stack></AppShell>;
 }
 
 export default function RootLayout() {

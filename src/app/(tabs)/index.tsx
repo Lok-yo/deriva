@@ -2,13 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { isPreviewPlace, SLRC_CENTER } from '../data/preview';
-import { distanceMeters, formatDistance } from '../domain/geo';
-import { MapView } from '../maps/MapView';
-import type { MapProps } from '../maps/types';
-import { useApp } from '../state/AppProvider';
-import { Brand } from '../ui/AppShell';
-import { colors, type } from '../ui/theme';
+import { isPreviewPlace, SLRC_CENTER } from '../../data/preview';
+import { distanceMeters, formatDistance } from '../../domain/geo';
+import { MapView } from '../../maps/MapView';
+import type { MapProps } from '../../maps/types';
+import { useApp } from '../../state/AppProvider';
+import { Brand } from '../../ui/AppShell';
+import { colors, type } from '../../ui/theme';
 
 export default function Explore() {
   const app = useApp();

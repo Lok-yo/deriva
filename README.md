@@ -15,6 +15,8 @@ npm start
 4. Al abrir Deriva, permite el acceso a ubicación mientras usas la app. El mapa se centra en el GPS del teléfono. Si lo rechazas, puedes explorar SLRC y reintentar con el botón de ubicación.
 5. Mantén la terminal abierta mientras pruebas la app. No necesitas crear un APK ni configurar EAS para abrirla.
 
+El servidor de desarrollo lo inicia el usuario con `npm start`. Las comprobaciones de código pueden ejecutarse sin abrir Expo Go ni dejar un servidor activo.
+
 Si la red impide conectar, detén el servidor y usa `npm run start:tunnel` para generar otro QR accesible desde otra red. Si acabas de copiar el proyecto a otro equipo, ejecuta `npm ci` antes de iniciar.
 
 El `.env` local ya contiene la URL y la clave **publishable** del proyecto Supabase conectado. Está excluido de Git. El backend está desplegado y el inicio de sesión se verificó con ese proyecto. El registro está integrado; la confirmación y entrega de correo dependen de los ajustes de Auth. Para otro equipo, copia `.env.example` a `.env` y configura tu proyecto. Los ejemplos locales de SLRC se identifican como tales y nunca se insertan en la base de datos.
@@ -27,7 +29,9 @@ Deriva mantiene las compras reales y el registro de push desactivados en Expo Go
 
 El mapa es la pantalla inicial y ocupa el espacio principal. Puedes moverlo, tocar un marcador para abrir una ficha con título, metadatos y acceso al detalle, y volver a tu ubicación con un botón. Hay tres pestañas: **Mapa**, **Publicar** y **Perfil**; Guardados y Actividad están dentro de Perfil.
 
-En el teléfono se usa `react-native-maps`: Google Maps en Android y Apple Maps en iOS, sin WebView. Está incluido en Expo Go SDK 57 y no necesita configurar una clave de Maps para esta prueba. La versión web usa Leaflet/OpenStreetMap únicamente como herramienta auxiliar. [Documentación oficial de Expo](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/).
+En **Android dentro de Expo Go**, el mapa usa Leaflet/OpenStreetMap en el WebView incluido en Expo Go. Esta variante evita el motor de Google afectado por el [mapa negro reportado en SDK 57](https://github.com/expo/expo/issues/49323). El documento se mantiene al seleccionar puntos o recibir cambios; la posición procede del permiso GPS de la app. iOS y las compilaciones propias conservan `react-native-maps` con Apple Maps o Google Maps. [Mapas en Expo](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/), [WebView en Expo](https://docs.expo.dev/versions/v57.0.0/sdk/webview/).
+
+Las tres pantallas principales usan un navegador de pestañas sin deslizamiento lateral. Detalles, cuenta, Guardados, Actividad y Premium se abren en la pila y tienen regreso a la pantalla anterior.
 
 ## Ejemplos de SLRC
 
@@ -135,7 +139,11 @@ npx expo export --platform all
 
 Las pruebas SQL están en `supabase/tests/deriva_rules.sql`: ejecútalas con una conexión SQL de administrador. Crean datos de prueba dentro de una transacción y terminan en `ROLLBACK`. No las ejecutes fragmentadas.
 
-**Verificación del rediseño:** `npm run check` pasó con **61/61 pruebas**, TypeScript y ESLint. `expo-doctor` pasó 21/21 controles y `expo install --check` confirmó compatibilidad. El servidor entregó los manifiestos y paquetes Android/iOS para Expo Go SDK 57; esta comprobación no generó un APK/IPA ni observó la ejecución en un teléfono.
+**Correcciones de Android Expo Go:** TypeScript, ESLint y **65/65 pruebas** pasaron. La exportación produjo paquetes Android/iOS/web sin abrir Expo Go ni dejar un servidor activo. El documento del mapa integrado cargó teselas reales al abrir SLRC y al centrar una posición de prueba, y pasó selección y actualizaciones del bridge. La comprobación auxiliar de rutas y tamaños se ejecutó sobre archivos exportados, sin servidor y sin avisos de Supabase. Estos resultados no demuestran la ejecución física del WebView/GPS en Android.
+
+El cliente usa la coordinación actual de Supabase Auth; se retiró `lock: processLock`, que generaba el aviso de obsolescencia en 2.117.2. El arranque del cliente pasó sin ese aviso con el almacenamiento nativo sustituido en memoria. La consulta de solo lectura confirmó el bloqueo de acceso anónimo a perfiles; no se modificaron permisos ni datos. [Migración oficial de Supabase](https://github.com/supabase/supabase-js/blob/master/packages/core/auth-js/migrations/lockless-coordination.md).
+
+**Verificación previa del rediseño:** `npm run check` pasó con **61/61 pruebas**, TypeScript y ESLint. `expo-doctor` pasó 21/21 controles y `expo install --check` confirmó compatibilidad. El servidor entregó los manifiestos y paquetes Android/iOS para Expo Go SDK 57; esta comprobación no generó un APK/IPA ni observó la ejecución en un teléfono.
 
 La comprobación auxiliar en navegador pasó rutas, encuadre de los seis ejemplos de SLRC, selección sin reiniciar el mapa, **Al azar**, detalles de ejemplos y formularios a 320, 390, 768 y 1440 px sin desbordamientos ni errores de consola. La revisión visual del mapa a 320/390 px y de Perfil a 390 px confirmó la composición simplificada. El mapa nativo, permiso inicial, GPS y gestos siguen pendientes de prueba en Expo Go en el teléfono.
 
@@ -150,7 +158,7 @@ Tras incorporar el mapa nativo, `npm audit` informa 24 entradas transitivas: 21 
 ## Estructura
 
 - `src/app`: pantallas de Expo Router.
-- `src/ui` y `src/maps`: interfaz móvil, mapa nativo y variante web auxiliar.
+- `src/ui` y `src/maps`: interfaz móvil, mapa nativo y mapa compatible con Android Expo Go.
 - `src/domain`: geografía y reglas de publicación, sin dependencias nativas.
 - `src/services`: sensores, fotos, sesión, datos, compras y notificaciones.
 - `src/state`: integración y suscripciones con reconexión.

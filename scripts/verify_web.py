@@ -2,22 +2,27 @@
 
 Run against the Expo Go development server:
   python scripts/verify_web.py --url http://localhost:8081
+Or use exported assets without starting any server:
+  python scripts/verify_web.py --static-directory verification/fixes-export
 Requires playwright==1.63.0 and Chromium. Browser geolocation is a fixture;
 this does not verify a native map or a physical phone's GPS.
 """
 import argparse
 import json
+import mimetypes
 import re
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 from playwright.sync_api import sync_playwright, expect
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--url', default='http://localhost:8081')
 parser.add_argument('--output', default='verification/redesign-web')
+parser.add_argument('--static-directory', type=Path)
 args = parser.parse_args()
 output = Path(args.output)
 output.mkdir(parents=True, exist_ok=True)
-report = {'routes': [], 'sizes': [], 'map_interactions': [], 'page_errors': [], 'console_errors': []}
+report = {'routes': [], 'sizes': [], 'map_interactions': [], 'page_errors': [], 'console_errors': [], 'supabase_warnings': []}
 
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
@@ -26,9 +31,30 @@ with sync_playwright() as playwright:
         geolocation={'latitude': 32.465, 'longitude': -114.77, 'accuracy': 25},
         permissions=['geolocation'],
     )
+    if args.static_directory:
+        static_root = args.static_directory.resolve()
+        assert (static_root / 'index.html').is_file(), 'Missing exported index.html'
+        args.url = 'https://deriva.test'
+
+        def exported_asset(route):
+            path = unquote(urlparse(route.request.url).path).lstrip('/')
+            target = (static_root / path).resolve()
+            if not target.is_relative_to(static_root):
+                route.abort()
+                return
+            if not target.is_file():
+                if Path(path).suffix:
+                    route.fulfill(status=404, body='Not found')
+                    return
+                target = static_root / 'index.html'
+            content_type = mimetypes.guess_type(str(target))[0] or 'application/octet-stream'
+            route.fulfill(path=str(target), content_type=content_type)
+
+        context.route(args.url + '/**', exported_asset)
     page = context.new_page()
     page.on('pageerror', lambda error: report['page_errors'].append(str(error)))
     page.on('console', lambda message: report['console_errors'].append(message.text) if message.type == 'error' else None)
+    page.on('console', lambda message: report['supabase_warnings'].append(message.text) if message.type == 'warning' and ('gotrue' in message.text.lower() or 'supabase' in message.text.lower()) else None)
     page.goto(args.url, wait_until='networkidle')
     home = page.get_by_test_id('map-screen').filter(visible=True)
     expect(home).to_be_visible()
@@ -59,12 +85,13 @@ with sync_playwright() as playwright:
     selected.get_by_role('button', name=re.compile(r'^Ver ')).click()
     expect(page).to_have_url(re.compile(r'/place/demo-'))
     expect(page.get_by_text(re.compile(r'^LUGAR DE EJEMPLO'))).to_be_visible()
+    expect(page.get_by_role('tab')).to_have_count(0)
     report['routes'].append('map marker + random selection + example detail')
     report['map_interactions'].append('Selecting a place preserves the map iframe')
 
     for path in ['/publish', '/saved', '/activity', '/profile', '/premium', '/auth']:
         page.goto(args.url + path, wait_until='networkidle')
-        expect(page.get_by_role('tab')).to_have_count(3)
+        expect(page.get_by_role('tab')).to_have_count(3 if path in ['/publish', '/profile'] else 0)
         assert 'Volvamos al camino.' not in page.locator('body').inner_text(), path
         report['routes'].append(path)
 
@@ -99,4 +126,5 @@ with sync_playwright() as playwright:
 (output / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
 assert not report['page_errors'], report['page_errors']
 assert not report['console_errors'], report['console_errors']
+assert not report['supabase_warnings'], report['supabase_warnings']
 print(json.dumps(report, ensure_ascii=False, indent=2))

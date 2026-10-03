@@ -6,7 +6,7 @@ La prueba actual se realiza en **Expo Go en el teléfono**, siguiendo la [guía 
 
 | Función | Prueba actual |
 | --- | --- |
-| Mapa nativo, cuenta, datos y Realtime | Abrir y probar en Expo Go; Google Maps en Android y Apple Maps en iOS |
+| Mapa, cuenta, datos y Realtime | Android Expo Go usa Leaflet/OpenStreetMap en WebView; iOS conserva Apple Maps |
 | GPS y magnetómetro | Probar con el hardware y permisos del teléfono |
 | Cámara con biometría | Huella en Android o Touch ID en iPhone compatible; no aceptar PIN ni omitir la autenticación |
 | Face ID en iOS | No disponible en Expo Go; requiere una compilación propia en una fase posterior |
@@ -15,7 +15,19 @@ La prueba actual se realiza en **Expo Go en el teléfono**, siguiendo la [guía 
 
 La limitación de Face ID está documentada por [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/local-authentication/). Expo tampoco ofrece push remoto en Expo Go para Android desde SDK 53; la app mantiene esta integración desactivada en Expo Go para ambas plataformas. [Notificaciones SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
 
-## Resultados del rediseño
+## Correcciones para Android Expo Go
+
+| Comprobación | Resultado |
+| --- | --- |
+| `npm run check` | TypeScript, ESLint y 65/65 pruebas pasaron |
+| Exportación de paquetes Android/iOS/web | Pasó; no genera APK/IPA ni abre Expo Go |
+| Documento del mapa integrado con bridge nativo sustituido en navegador | Teselas reales cargadas al abrir SLRC y al centrar la posición de prueba; selección y actualizaciones pasaron |
+| Rutas y tamaños sobre archivos exportados, sin servidor | Pasaron sin desbordamientos, errores de consola ni avisos de Supabase |
+| Arranque del cliente Supabase | Aviso de `lock` ausente; almacenamiento nativo sustituido en memoria; acceso anónimo a perfiles bloqueado como corresponde |
+| Servidor de desarrollo | Detenido; el usuario lo inicia |
+| Variante del mapa, GPS y transiciones en Android físico | Pendientes de confirmación en Expo Go |
+
+## Resultados del rediseño inicial
 
 | Comprobación | Resultado |
 | --- | --- |
@@ -48,7 +60,7 @@ Las pruebas de API enviaron evidencia de sensores declarada por el cliente; no t
 
 ## Mapa principal del rediseño
 
-Los resultados anteriores son historial; no prueban el nuevo mapa nativo. La aceptación siguiente se registra desde Expo Go, con modelo de teléfono y plataforma. `react-native-maps` está [incluido en Expo Go SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/) y no necesita una clave de Maps para esta prueba.
+Los resultados anteriores son historial. El usuario observó el mapa negro en Android; la variante actual de Android Expo Go evita el motor Google mediante Leaflet/OpenStreetMap en WebView. El síntoma coincide con el [reporte de Expo SDK 57](https://github.com/expo/expo/issues/49323), pero falta observar la corrección en el teléfono. iOS conserva `react-native-maps`. La aceptación siguiente se registra desde Expo Go, con modelo de teléfono y plataforma; el usuario inicia el servidor.
 
 - [ ] Abrir sin cuenta: se ve directamente el mapa y se solicita permiso de ubicación en primer plano.
 - [ ] Conceder permiso: el mapa se centra en el GPS real y el punto de ubicación coincide con el teléfono.
@@ -57,7 +69,7 @@ Los resultados anteriores son historial; no prueban el nuevo mapa nativo. La ace
 - [ ] Mover y ampliar el mapa: responde a los gestos y no recentra continuamente. El botón de ubicación vuelve al GPS actual.
 - [ ] Ver ejemplos de SLRC identificados como ejemplos; sus marcadores no aparecen como usuarios o publicaciones reales.
 - [ ] Tocar un marcador: aparece una ficha compacta con título, metadatos y acceso al detalle. La acción abre el detalle correcto y regresar conserva el mapa.
-- [ ] Navegar por Mapa, Publicar y Perfil. Guardados y Actividad se abren desde Perfil.
+- [ ] Navegar por Mapa, Publicar y Perfil sin animación lateral. Guardados y Actividad se abren desde Perfil, y el regreso vuelve a la pestaña anterior.
 - [ ] Comprobar legibilidad con tamaño de texto aumentado, VoiceOver/TalkBack y controles fuera de la barra de estado e indicador de inicio.
 
 ## Teléfono con plan gratuito

@@ -17,7 +17,7 @@ export type MapProps = {
 
 export type MapMessage = {
   derivaMap: string;
-  type: 'ready' | 'error' | 'place' | 'coordinate';
+  type: 'initialized' | 'ready' | 'error' | 'place' | 'coordinate';
   id?: string;
   latitude?: number;
   longitude?: number;
@@ -27,7 +27,7 @@ export function parseMapMessage(value: unknown, bridge: string): MapMessage | nu
   try {
     const data = typeof value === 'string' ? JSON.parse(value) : value;
     if (!data || typeof data !== 'object' || data.derivaMap !== bridge) return null;
-    if (!['ready', 'error', 'place', 'coordinate'].includes(data.type)) return null;
+    if (!['initialized', 'ready', 'error', 'place', 'coordinate'].includes(data.type)) return null;
     if (data.type === 'place' && typeof data.id !== 'string') return null;
     if (data.type === 'coordinate' && (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude) || Math.abs(data.latitude) > 90 || Math.abs(data.longitude) > 180)) return null;
     return data as MapMessage;

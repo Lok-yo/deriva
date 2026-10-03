@@ -2,14 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useApp } from '../state/AppProvider';
-import { Button, type IconName } from '../ui/Button';
-import { Notice, errorMessage } from '../ui/Feedback';
-import { NotificationPreferences } from '../ui/NotificationPreferences';
-import { Page, PageHeading } from '../ui/Page';
-import { PlaceRow } from '../ui/PlaceRow';
-import { ProfileEditor } from '../ui/ProfileEditor';
-import { colors, layout, type } from '../ui/theme';
+import { useApp } from '../../state/AppProvider';
+import { Button, type IconName } from '../../ui/Button';
+import { Notice, errorMessage } from '../../ui/Feedback';
+import { NotificationPreferences } from '../../ui/NotificationPreferences';
+import { Page, PageHeading } from '../../ui/Page';
+import { PlaceRow } from '../../ui/PlaceRow';
+import { ProfileEditor } from '../../ui/ProfileEditor';
+import { colors, layout, type } from '../../ui/theme';
 
 function MenuRow({ title, detail, icon, onPress, expanded }: { title: string; detail?: string; icon: IconName; onPress: () => void; expanded?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={expanded == null ? undefined : { expanded }} onPress={onPress} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.65 }]}>

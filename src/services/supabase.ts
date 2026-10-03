@@ -3,7 +3,7 @@ import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
-import { createClient, processLock } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { captureExpectedSession, createSessionClient } from './identity';
 
 const nativeStorage = {
@@ -32,7 +32,7 @@ const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
 export const isConfigured = /^https:\/\//.test(url) && !!key;
 export const supabase = isConfigured ? createClient(url, key, {
-  auth: { storage: Platform.OS === 'web' ? AsyncStorage : nativeStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false, lock: processLock },
+  auth: { storage: Platform.OS === 'web' ? AsyncStorage : nativeStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
 }) : null;
 
 if (Platform.OS !== 'web' && supabase) {

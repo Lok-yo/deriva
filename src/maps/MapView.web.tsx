@@ -18,10 +18,8 @@ export function MapView(props: MapProps) {
       if (event.source !== frame.current?.contentWindow) return;
       const message = parseMapMessage(event.data, bridge);
       if (!message) return;
-      if (message.type === 'ready' || message.type === 'error') {
-        setState(message.type);
-        if (message.type === 'ready') frame.current?.contentWindow?.postMessage({ derivaMap: bridge, type: 'update', payload: mapUpdate(callbacks.current) }, '*');
-      }
+      if (message.type === 'initialized') frame.current?.contentWindow?.postMessage({ derivaMap: bridge, type: 'update', payload: mapUpdate(callbacks.current) }, '*');
+      if (message.type === 'ready' || message.type === 'error') setState(message.type);
       if (message.type === 'place' && message.id) callbacks.current.onSelectPlace?.(message.id);
       if (message.type === 'coordinate' && message.latitude != null && message.longitude != null) callbacks.current.onSelectCoordinate?.({ latitude: message.latitude, longitude: message.longitude });
     };

@@ -20,7 +20,9 @@ Usar tokens compartidos para color, tipo, espaciado y radios. Mantener el ajuste
 
 ## Comportamiento nativo
 
-Android usa Google Maps e iOS Apple Maps mediante `react-native-maps`, incluido en Expo Go SDK 57. El mapa permite gestos y selección nativos; no se incrusta una página web en el teléfono. La implementación web conserva su mapa auxiliar para desarrollo y no define la composición del producto móvil. [Documentación de Expo](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/).
+Android dentro de Expo Go usa Leaflet/OpenStreetMap dentro del WebView para evitar el [fallo del mapa negro en SDK 57](https://github.com/expo/expo/issues/49323). El documento permanece estable al seleccionar o actualizar lugares, usa un bridge validado y conserva atribución, estado de carga y recuperación. iOS y las compilaciones propias mantienen `react-native-maps`. [Mapas en Expo](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/), [WebView en Expo](https://docs.expo.dev/versions/v57.0.0/sdk/webview/).
+
+La barra inferior corresponde a tres pestañas reales sin animación lateral. Detalles y pantallas secundarias se abren en una pila y conservan el gesto o botón de regreso.
 
 Los permisos se solicitan al comenzar la exploración y solo en primer plano. El usuario puede mover el mapa sin que la app lo recentre continuamente. Carga, falta de conexión y permisos rechazados ofrecen una recuperación concreta. Respetar el botón/gesto de regreso, VoiceOver/TalkBack y la reducción de animaciones.
 

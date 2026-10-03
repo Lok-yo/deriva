@@ -8,6 +8,8 @@ adaptive
 
 Aplicación nativa para teléfonos Android e iOS con React Native y Expo. La prueba actual debe abrirse en **Expo Go**, sin generar un APK. La versión web es una herramienta auxiliar de desarrollo.
 
+El usuario inicia el servidor de Expo; el agente no lo inicia ni lo deja activo durante verificaciones.
+
 ## Product Purpose
 
 Descubrir lugares y compartir puntos con fotografía y título. El mapa es la pantalla de entrada y el centro de la exploración: al abrir la app se solicita ubicación y, con permiso, se centra en el GPS del teléfono.
