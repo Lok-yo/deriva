@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Stack, router, type ErrorBoundaryProps } from 'expo-router';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../state/AppProvider';
 import { listenForNotificationTaps } from '../services/notifications';
@@ -14,7 +14,6 @@ function Routes() {
     if (!ready) return;
     return listenForNotificationTaps(id => router.push({ pathname: '/place/[id]', params: { id } }));
   }, [ready]);
-  if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 16 }}><ActivityIndicator color={colors.green} /><Text style={type.small}>Preparando tu próxima aventura…</Text></View>;
   return <AppShell><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background }, animation: 'slide_from_right' }} /></AppShell>;
 }
 

@@ -6,16 +6,29 @@ La prueba actual se realiza en **Expo Go en el teléfono**, siguiendo la [guía 
 
 | Función | Prueba actual |
 | --- | --- |
-| Mapa, cuenta, datos y Realtime | Abrir y probar en Expo Go |
+| Mapa nativo, cuenta, datos y Realtime | Abrir y probar en Expo Go; Google Maps en Android y Apple Maps en iOS |
 | GPS y magnetómetro | Probar con el hardware y permisos del teléfono |
 | Cámara con biometría | Huella en Android o Touch ID en iPhone compatible; no aceptar PIN ni omitir la autenticación |
 | Face ID en iOS | No disponible en Expo Go; requiere una compilación propia en una fase posterior |
 | Compras reales | Deriva las bloquea en Expo Go; no conceder Premium por una compra simulada |
-| Push remoto | Deriva no registra tokens en Expo Go; comprobar el inbox de Actividad mediante Realtime con la app abierta |
+| Push remoto | Deriva no registra tokens ni activa ese flujo de zona en Expo Go. El inbox requiere una cuenta con zona de alertas ya configurada |
 
 La limitación de Face ID está documentada por [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/local-authentication/). Expo tampoco ofrece push remoto en Expo Go para Android desde SDK 53; la app mantiene esta integración desactivada en Expo Go para ambas plataformas. [Notificaciones SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
 
-## Resultados comprobados, 3 de octubre de 2026
+## Resultados del rediseño
+
+| Comprobación | Resultado |
+| --- | --- |
+| `npm run check` | TypeScript, ESLint y 61/61 pruebas pasaron |
+| Compatibilidad de dependencias / Expo Doctor | `expo install --check` correcto; 21/21 controles de Expo |
+| Servidor para Expo Go SDK 57 | Manifiestos y paquetes Android/iOS descargados; no son APK/IPA ni una prueba física |
+| Navegador auxiliar a 320, 390, 768 y 1440 px | Rutas, encuadre de los seis ejemplos de SLRC, selección sin reiniciar el mapa, Al azar, detalles de ejemplos y formularios pasaron sin desbordamientos ni errores de consola |
+| Revisión visual auxiliar | Mapa a 320/390 px y Perfil a 390 px revisados; composición simplificada coherente |
+| Apertura, mapa nativo, permiso inicial, GPS y gestos en teléfono | Pendientes de prueba con Expo Go |
+
+Las comprobaciones del navegador cubren únicamente la variante auxiliar. No demuestran el proveedor nativo del mapa, el permiso del sistema ni la ubicación física del teléfono.
+
+## Resultados previos al rediseño, 3 de octubre de 2026
 
 | Comprobación | Resultado |
 | --- | --- |
@@ -33,10 +46,24 @@ La limitación de Face ID está documentada por [Expo SDK 57](https://docs.expo.
 
 Las pruebas de API enviaron evidencia de sensores declarada por el cliente; no tomaron fotografías ni usaron biometría/GPS físicos. Las dos cuentas, la fotografía y sus datos temporales de prueba se eliminaron; los datos originales de asistencia se conservaron. Un receipt correcto del push confirma aceptación por APNs/FCM; la entrega visible debe observarse en el teléfono.
 
+## Mapa principal del rediseño
+
+Los resultados anteriores son historial; no prueban el nuevo mapa nativo. La aceptación siguiente se registra desde Expo Go, con modelo de teléfono y plataforma. `react-native-maps` está [incluido en Expo Go SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/) y no necesita una clave de Maps para esta prueba.
+
+- [ ] Abrir sin cuenta: se ve directamente el mapa y se solicita permiso de ubicación en primer plano.
+- [ ] Conceder permiso: el mapa se centra en el GPS real y el punto de ubicación coincide con el teléfono.
+- [ ] Rechazar permiso: se puede explorar SLRC; la app ofrece una recuperación y no identifica SLRC como el GPS del usuario.
+- [ ] Desactivar los servicios de ubicación: se puede seguir explorando y el control de ubicación informa del problema sin simular una lectura.
+- [ ] Mover y ampliar el mapa: responde a los gestos y no recentra continuamente. El botón de ubicación vuelve al GPS actual.
+- [ ] Ver ejemplos de SLRC identificados como ejemplos; sus marcadores no aparecen como usuarios o publicaciones reales.
+- [ ] Tocar un marcador: aparece una ficha compacta con título, metadatos y acceso al detalle. La acción abre el detalle correcto y regresar conserva el mapa.
+- [ ] Navegar por Mapa, Publicar y Perfil. Guardados y Actividad se abren desde Perfil.
+- [ ] Comprobar legibilidad con tamaño de texto aumentado, VoiceOver/TalkBack y controles fuera de la barra de estado e indicador de inicio.
+
 ## Teléfono con plan gratuito
 
 - [ ] Iniciar `npm start`, escanear el QR con Expo Go, crear cuenta y confirmar correo si Supabase lo requiere.
-- [ ] Rechazar permiso de GPS: aparece una explicación y no se publica. Con permiso, el mapa centra tu ubicación y muestra precisión real.
+- [ ] Rechazar permiso de GPS: se permite explorar y no se publica. Con permiso, el mapa centra tu ubicación y usa la precisión real.
 - [ ] Configurar huella en Android o Touch ID en iPhone compatible. Pulsar cámara: aparece el diálogo biométrico antes de abrir la cámara. Cancelarlo no abre la cámara. No se acepta PIN como sustituto.
 - [ ] En un iPhone que solo ofrece Face ID, pulsar cámara informa de la limitación de Expo Go y permite seguir explorando; no abre la cámara sin autenticar.
 - [ ] Tomar una fotografía y publicar un título. El lugar aparece con coordenadas actuales y fotografía JPEG.
@@ -59,7 +86,7 @@ Estas comprobaciones requieren una compilación propia y la configuración de Re
 ## Realtime y push
 
 - [ ] Abrir dos cuentas distintas. Publicar con una y observar el lugar nuevo en la otra sin recargar.
-- [ ] En Expo Go, comprobar los avisos de Actividad en tiempo real con la app abierta; intentar activar push muestra su limitación sin registrar un token ni simular su entrega.
+- [ ] En Expo Go, con una cuenta cuya zona ya esté configurada, comprobar los avisos de Actividad en tiempo real con la app abierta. Intentar activar push muestra su limitación sin registrar un token, configurar una zona nueva ni simular una entrega.
 
 Los siguientes pasos de push se realizan posteriormente con una compilación propia y FCM/APNs configurados:
 

@@ -1,6 +1,6 @@
 # Deriva
 
-Una app móvil React Native + Expo para descubrir y compartir lugares en Android e iOS. **Para probarla ahora, ábrela en Expo Go desde tu teléfono.**
+Una app móvil React Native + Expo para descubrir y compartir lugares en Android e iOS. **Abre en Expo Go y entra directamente al mapa**, centrado en tu ubicación cuando concedas el permiso.
 
 ## Abrir en Expo Go
 
@@ -12,15 +12,39 @@ npm start
 1. Instala [Expo Go](https://expo.dev/go) en Android o iOS, con una versión compatible con el SDK 57 del proyecto.
 2. Conecta el teléfono y este equipo a la misma red Wi-Fi.
 3. Escanea el QR de la terminal: desde Expo Go en Android o con la cámara del iPhone. Se abre Deriva dentro de Expo Go.
-4. Mantén la terminal abierta mientras pruebas la app. No necesitas crear un APK ni configurar EAS para abrirla.
+4. Al abrir Deriva, permite el acceso a ubicación mientras usas la app. El mapa se centra en el GPS del teléfono. Si lo rechazas, puedes explorar SLRC y reintentar con el botón de ubicación.
+5. Mantén la terminal abierta mientras pruebas la app. No necesitas crear un APK ni configurar EAS para abrirla.
 
 Si la red impide conectar, detén el servidor y usa `npm run start:tunnel` para generar otro QR accesible desde otra red. Si acabas de copiar el proyecto a otro equipo, ejecuta `npm ci` antes de iniciar.
 
-El `.env` local ya contiene la URL y la clave **publishable** del proyecto Supabase conectado. Está excluido de Git. El backend está desplegado y el inicio de sesión se verificó con ese proyecto. El registro está integrado; la confirmación y entrega de correo dependen de los ajustes de Auth. Para otro equipo, copia `.env.example` a `.env` y configura tu proyecto. Sin cuenta se muestran seis ejemplos identificados como vista previa; esos lugares nunca se insertan en la base de datos.
+El `.env` local ya contiene la URL y la clave **publishable** del proyecto Supabase conectado. Está excluido de Git. El backend está desplegado y el inicio de sesión se verificó con ese proyecto. El registro está integrado; la confirmación y entrega de correo dependen de los ajustes de Auth. Para otro equipo, copia `.env.example` a `.env` y configura tu proyecto. Los ejemplos locales de SLRC se identifican como tales y nunca se insertan en la base de datos.
 
 En Expo Go puedes probar la navegación, el mapa, la cuenta, Supabase y Realtime, el GPS y la brújula. La cámara exige biometría real: huella en Android o Touch ID en un iPhone compatible. **Face ID no funciona en Expo Go**, así que un iPhone que solo tenga Face ID podrá explorar, pero no completar la foto protegida. [Limitación oficial de Expo](https://docs.expo.dev/versions/v57.0.0/sdk/local-authentication/).
 
-Deriva mantiene las compras reales y el registro de push desactivados en Expo Go; los avisos recibidos por Realtime se consultan en **Actividad** con la app abierta. La integración de tiendas y push está preparada para una fase posterior con una compilación propia. No se simula una compra ni se omite la biometría. [RevenueCat para Expo](https://www.revenuecat.com/docs/getting-started/installation/expo), [notificaciones en SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
+Deriva mantiene las compras reales y el registro de push desactivados en Expo Go. **Actividad**, accesible desde Perfil, muestra los avisos de una cuenta cuya zona de alertas ya esté configurada; Expo Go no activa el flujo de registro push ni configura una zona nueva mediante ese flujo. La integración de tiendas y push está preparada para una fase posterior con una compilación propia. No se simula una compra ni se omite la biometría. [RevenueCat para Expo](https://www.revenuecat.com/docs/getting-started/installation/expo), [notificaciones en SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
+
+## Mapa y navegación
+
+El mapa es la pantalla inicial y ocupa el espacio principal. Puedes moverlo, tocar un marcador para abrir una ficha con título, metadatos y acceso al detalle, y volver a tu ubicación con un botón. Hay tres pestañas: **Mapa**, **Publicar** y **Perfil**; Guardados y Actividad están dentro de Perfil.
+
+En el teléfono se usa `react-native-maps`: Google Maps en Android y Apple Maps en iOS, sin WebView. Está incluido en Expo Go SDK 57 y no necesita configurar una clave de Maps para esta prueba. La versión web usa Leaflet/OpenStreetMap únicamente como herramienta auxiliar. [Documentación oficial de Expo](https://docs.expo.dev/versions/v57.0.0/sdk/map-view/).
+
+## Ejemplos de SLRC
+
+Los marcadores de San Luis Río Colorado, Sonora, son ejemplos locales para explorar la interfaz. No representan publicaciones de personas ni una lectura del GPS. Las coordenadas de parques corresponden a referencias aproximadas de sus superficies, no a entradas o rutas verificadas.
+
+| Ejemplo | Coordenada de referencia | Fuente cartográfica |
+| --- | --- | --- |
+| Bosque de la Ciudad | 32.4452716, -114.7894500 | [OpenStreetMap](https://www.openstreetmap.org/way/233564759) |
+| Plaza Benito Juárez | 32.4800748, -114.7804175 | [OpenStreetMap](https://www.openstreetmap.org/way/233567470) |
+| Parque Solidaridad | 32.4525674, -114.8043819 | [OpenStreetMap](https://www.openstreetmap.org/way/233744892) |
+| Parque La Tortuga | 32.4327620, -114.7571808 | [OpenStreetMap](https://www.openstreetmap.org/way/253208952) |
+| Parque Yoreme | 32.4634193, -114.7408790 | [OpenStreetMap](https://www.openstreetmap.org/way/233669476) |
+| Parque Emiliano Zapata | 32.4671593, -114.8019795 | [OpenStreetMap](https://www.openstreetmap.org/way/242092411) |
+
+Los nombres y direcciones de los tres primeros también aparecen en el [Programa Municipal de Desarrollo Urbano de SLRC](https://sanluisrc.gob.mx/wp-content/uploads/2026/02/200525_ACT_PMDU-SLRC-DOCUMENTO.pdf), sección IV.3.8. Los ejemplos no añaden datos al Supabase compartido.
+
+Los seis ejemplos siguen visibles al iniciar sesión; no se guardan ni se eliminan como publicaciones reales. Sus fotografías de muestra se identifican en el detalle como ilustrativas y no corresponden a esos parques.
 
 ## Funciones
 
@@ -111,21 +135,27 @@ npx expo export --platform all
 
 Las pruebas SQL están en `supabase/tests/deriva_rules.sql`: ejecútalas con una conexión SQL de administrador. Crean datos de prueba dentro de una transacción y terminan en `ROLLBACK`. No las ejecutes fragmentadas.
 
-Resultado al 3 de octubre de 2026: **49 pruebas**, TypeScript, ESLint, compatibilidad de dependencias, 21/21 controles de Expo y bundles Android/iOS/web pasaron. Las tres funciones pasaron `deno check` y ocho comprobaciones de handlers con dependencias sustituidas. También pasaron la suite SQL en PostgreSQL 17 alojado y 16 comprobaciones con API real de Auth/Storage, permisos/RLS y eventos Realtime entre dos cuentas temporales. Las tres funciones están activas en versión 1 y el cron del worker responde HTTP 200 con cola vacía.
+**Verificación del rediseño:** `npm run check` pasó con **61/61 pruebas**, TypeScript y ESLint. `expo-doctor` pasó 21/21 controles y `expo install --check` confirmó compatibilidad. El servidor entregó los manifiestos y paquetes Android/iOS para Expo Go SDK 57; esta comprobación no generó un APK/IPA ni observó la ejecución en un teléfono.
 
-La vista previa web pasó las anchuras 320, 390, 768 y 1440 px sin desbordamientos ni errores de ejecución o consola. El recorrido web con sesión real pasó login, edición de perfil, preferencias, controles de acceso a cámara/compras, inbox y logout sin errores de página. Las dos cuentas, la fotografía y sus datos temporales de prueba se eliminaron; los datos originales de asistencia se conservaron.
+La comprobación auxiliar en navegador pasó rutas, encuadre de los seis ejemplos de SLRC, selección sin reiniciar el mapa, **Al azar**, detalles de ejemplos y formularios a 320, 390, 768 y 1440 px sin desbordamientos ni errores de consola. La revisión visual del mapa a 320/390 px y de Perfil a 390 px confirmó la composición simplificada. El mapa nativo, permiso inicial, GPS y gestos siguen pendientes de prueba en Expo Go en el teléfono.
+
+Verificación previa al rediseño, 3 de octubre de 2026: **49 pruebas**, TypeScript, ESLint, compatibilidad de dependencias, 21/21 controles de Expo y bundles Android/iOS/web pasaron. Las tres funciones pasaron `deno check` y ocho comprobaciones de handlers con dependencias sustituidas. También pasaron la suite SQL en PostgreSQL 17 alojado y 16 comprobaciones con API real de Auth/Storage, permisos/RLS y eventos Realtime entre dos cuentas temporales. Las tres funciones están activas en versión 1 y el cron del worker responde HTTP 200 con cola vacía.
+
+La variante web anterior pasó las anchuras 320, 390, 768 y 1440 px sin desbordamientos ni errores de ejecución o consola. El recorrido web con sesión real pasó login, edición de perfil, preferencias, controles de acceso a cámara/compras, inbox y logout sin errores de página. Las dos cuentas, la fotografía y sus datos temporales de prueba se eliminaron; los datos originales de asistencia se conservaron. Estos resultados se conservan como historial y no comprueban el nuevo mapa nativo.
 
 La guía de [aceptación en dispositivos](docs/acceptance.md) distingue lo verificado en este equipo de los pasos que necesitan tu teléfono. La apertura en Expo Go y los sensores físicos aún deben observarse en el dispositivo. Para la fase posterior de tiendas/push quedan pendientes el proyecto EAS, las claves/productos RevenueCat, la firma nativa y las credenciales FCM/APNs. Los bundles no equivalen a una prueba de sensores físicos.
 
-`npm audit` aún informa 23 entradas transitivas: 20 altas y 3 moderadas, derivadas de `braces`, `node-forge` y `decode-uri-component`. Se corrigió `uuid` con una versión compatible; forzar el resto mediante `npm audit fix --force` propone degradaciones incompatibles de Expo/React Native. Revisa actualizaciones compatibles antes de distribuir. El advisor de Supabase informa un WARN por protección de contraseñas filtradas desactivada, una configuración preexistente del Auth compartido que esta app conserva, y cuatro INFO por tablas privadas y cola sin políticas, deliberadamente inaccesibles a usuarios. [Protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection), [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+Tras incorporar el mapa nativo, `npm audit` informa 24 entradas transitivas: 21 altas y 3 moderadas. La revisión previa identificó `braces`, `node-forge` y `decode-uri-component` entre sus causas y corrigió `uuid` con una versión compatible; forzar el resto mediante `npm audit fix --force` propone degradaciones incompatibles de Expo/React Native. Revisa actualizaciones compatibles antes de distribuir. El advisor de Supabase informa un WARN por protección de contraseñas filtradas desactivada, una configuración preexistente del Auth compartido que esta app conserva, y cuatro INFO por tablas privadas y cola sin políticas, deliberadamente inaccesibles a usuarios. [Protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection), [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 
 ## Estructura
 
 - `src/app`: pantallas de Expo Router.
-- `src/ui` y `src/maps`: interfaz y mapa OpenStreetMap/Leaflet.
+- `src/ui` y `src/maps`: interfaz móvil, mapa nativo y variante web auxiliar.
 - `src/domain`: geografía y reglas de publicación, sin dependencias nativas.
 - `src/services`: sensores, fotos, sesión, datos, compras y notificaciones.
 - `src/state`: integración y suscripciones con reconexión.
 - `supabase`: migraciones, pruebas y funciones del servidor.
 
-El mapa usa Leaflet 1.9.4 con comprobación de integridad y teselas de OpenStreetMap. Requiere conexión. La exploración incluye los 300 lugares más recientes y los guardados o notificaciones anteriores; para volúmenes mayores conviene paginar el mapa por región y usar un proveedor de teselas con capacidad adecuada.
+Los mapas requieren conexión para cargar cartografía. La variante web usa Leaflet 1.9.4 con comprobación de integridad y teselas de OpenStreetMap. La exploración consulta los 300 lugares más recientes y los guardados o notificaciones anteriores; para volúmenes mayores conviene paginar por región.
+
+[PRODUCT.md](PRODUCT.md) registra el propósito y las restricciones del producto; [DESIGN.md](DESIGN.md) conserva las decisiones del rediseño móvil.

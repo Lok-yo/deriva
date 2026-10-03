@@ -8,6 +8,7 @@ export type Photo = {
   biometricVerified: boolean;
 };
 export type Position = Coordinate & { accuracy: number; timestamp: string; mocked: boolean };
+export type MapPosition = Coordinate & { accuracy: number | null; timestamp: string };
 export type Place = Coordinate & {
   id: string;
   owner_id: string;

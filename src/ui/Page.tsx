@@ -6,11 +6,10 @@ export function Page({ children, style, keyboard = false }: { children: React.Re
   return keyboard ? <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>{scroll}</KeyboardAvoidingView> : scroll;
 }
 
-export function PageHeading({ eyebrow, title, body, action }: { eyebrow: string; title: string; body?: string; action?: React.ReactNode }) {
+export function PageHeading({ title, body, action }: { eyebrow?: string; title: string; body?: string; action?: React.ReactNode }) {
   return (
     <View style={[layout.row, { alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap' }]}>
       <View style={{ gap: 8, flex: 1, minWidth: 220 }}>
-        <Text style={type.eyebrow}>{eyebrow.toUpperCase()}</Text>
         <Text accessibilityRole="header" style={type.title}>{title}</Text>
         {body && <Text style={[type.body, { maxWidth: 550 }]}>{body}</Text>}
       </View>

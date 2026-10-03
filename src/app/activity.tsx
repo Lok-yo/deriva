@@ -28,7 +28,8 @@ export default function Activity() {
     finally { setBusy(false); }
   }
   return <Page>
-    <PageHeading eyebrow="La comunidad se mueve" title="Algo nuevo en el camino." body="Los nuevos hallazgos cerca de tu zona de alertas llegan aquí." action={unread.length > 0 ? <Button label="Marcar todo como leído" icon="checkmark-done-outline" variant="secondary" onPress={() => void readAll()} loading={busy} /> : undefined} />
+    <Button label="Volver al perfil" icon="arrow-back-outline" variant="ghost" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onPress={() => router.canGoBack() ? router.back() : router.replace('/profile')} />
+    <PageHeading title="Actividad" action={unread.length > 0 ? <Button label="Marcar todo como leído" icon="checkmark-done-outline" variant="secondary" onPress={() => void readAll()} loading={busy} /> : undefined} />
     {error && <Notice tone="error">{error}</Notice>}
     {!app.session || app.isPreview ? <EmptyState title="Que el próximo hallazgo te encuentre." body="Crea una cuenta y activa tus alertas para enterarte de los nuevos lugares de la comunidad." icon="notifications-outline" action="Crear cuenta o iniciar sesión" onAction={() => router.push('/auth')} /> : <>
       {!app.notificationsEnabled && <View style={layout.card}><Text style={type.label}>Elige qué tan cerca quieres descubrir.</Text><Text style={type.small}>Activa las alertas desde tu perfil. Te pediremos permiso para enviarlas a tu teléfono.</Text><Button label="Configurar mis alertas" icon="options-outline" variant="secondary" onPress={() => router.navigate('/profile')} /></View>}

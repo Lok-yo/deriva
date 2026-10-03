@@ -1,25 +1,35 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useApp } from '../state/AppProvider';
-import { Button } from '../ui/Button';
-import { Badge, EmptyState, Notice, errorMessage } from '../ui/Feedback';
+import { Button, type IconName } from '../ui/Button';
+import { Notice, errorMessage } from '../ui/Feedback';
 import { NotificationPreferences } from '../ui/NotificationPreferences';
 import { Page, PageHeading } from '../ui/Page';
 import { PlaceRow } from '../ui/PlaceRow';
 import { ProfileEditor } from '../ui/ProfileEditor';
-import { SensorGuide } from '../ui/SensorGuide';
-import { colors, layout, serif, type } from '../ui/theme';
+import { colors, layout, type } from '../ui/theme';
+
+function MenuRow({ title, detail, icon, onPress, expanded }: { title: string; detail?: string; icon: IconName; onPress: () => void; expanded?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={expanded == null ? undefined : { expanded }} onPress={onPress} style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.65 }]}>
+    <Ionicons name={icon} size={21} color={colors.green} />
+    <Text style={styles.menuTitle}>{title}</Text>
+    {detail && <Text style={type.small}>{detail}</Text>}
+    <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={18} color={colors.muted} />
+  </Pressable>;
+}
 
 export default function Profile() {
   const app = useApp();
-  const { width } = useWindowDimensions();
+  const [section, setSection] = useState<'name' | 'alerts' | 'places' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const ownPlaces = app.places.filter(p => p.owner_id === app.session?.user.id);
-  const name = app.profile?.display_name ?? '';
+  const ownPlaces = app.places.filter(place => place.owner_id === app.session?.user.id);
+  const name = app.profile?.display_name ?? 'Explorador';
+  const unread = app.notifications.filter(notification => !notification.read_at).length;
+  const toggle = (next: typeof section) => setSection(current => current === next ? null : next);
   async function signOut() {
     setBusy(true); setError(null);
     try { await app.signOut(); router.replace('/'); }
@@ -27,23 +37,44 @@ export default function Profile() {
     finally { setBusy(false); }
   }
   return <Page keyboard>
-    <PageHeading eyebrow="Tu forma de explorar" title={app.session ? 'Un camino muy tuyo.' : 'Cada aventura empieza contigo.'} />
+    <PageHeading title="Perfil" />
     {error && <Notice tone="error">{error}</Notice>}
     {message && <Notice tone="success">{message}</Notice>}
-    {!app.session || app.isPreview ? <>
-      <EmptyState title="Encuentra tu lugar en Deriva." body="Crea una cuenta gratuita para compartir lugares, guardar tus favoritos y recibir alertas cerca de ti." icon="person-outline" action="Crear cuenta o iniciar sesión" onAction={() => router.push('/auth')} />
-      <View style={layout.card}><Text accessibilityRole="header" style={type.heading}>Gratis para empezar. Premium para ir más allá.</Text><Text style={type.small}>Comparte una foto tomada ahora desde tu ubicación. Con Premium, elige cualquier punto y usa fotos de tu galería.</Text><Button label="Conocer Premium" icon="sparkles-outline" variant="secondary" onPress={() => router.push('/premium')} style={{ alignSelf: 'flex-start' }} /></View>
-      <SensorGuide />
-    </> : <>
-      <View style={[layout.row, { flexWrap: 'wrap', gap: 20 }]}><View style={styles.avatar}><Text style={styles.initial}>{(name || app.session.user.email || 'D').slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1, gap: 6 }}><Text accessibilityRole="header" style={type.heading}>{name || 'Explorador'}</Text><Text selectable style={type.small}>{app.session.user.email}</Text><Badge text={app.premium ? 'PREMIUM ACTIVO' : 'PLAN GRATUITO'} /></View><Button label={app.premium ? 'Gestionar Premium' : 'Descubrir Premium'} icon="sparkles-outline" variant="secondary" onPress={() => router.push('/premium')} /></View>
-      <View style={[layout.section, width >= 1100 && { flexDirection: 'row', alignItems: 'flex-start', gap: 24 }]}><View style={{ flex: 1 }}><ProfileEditor key={name} name={name} onSaved={() => setMessage('Tu nombre se actualizó.')} /></View><View style={{ flex: 1 }}><NotificationPreferences key={`${app.notificationsEnabled}:${app.notificationRadius}`} initialEnabled={app.notificationsEnabled} initialRadius={app.notificationRadius} onSaved={setMessage} /></View></View>
-      <View style={layout.section}><View style={[layout.row, { justifyContent: 'space-between', flexWrap: 'wrap' }]}><Text accessibilityRole="header" style={type.heading}>Tus hallazgos en el mapa</Text><Button label="Publicar uno nuevo" icon="add-outline" variant="ghost" onPress={() => router.navigate('/publish')} /></View>{ownPlaces.length ? ownPlaces.map(place => <PlaceRow key={place.id} place={place} saved={app.savedIds.includes(place.id)} onSave={() => { void app.toggleSaved(place.id).catch(e => setError(errorMessage(e))); }} onOpen={() => router.push({ pathname: '/place/[id]', params: { id: place.id } })} onRetryPhoto={app.refresh} />) : <EmptyState title="Tu primera historia está por escribirse." body="Comparte ese rincón que merece encontrarse." icon="location-outline" action="Publicar un lugar" onAction={() => router.navigate('/publish')} />}</View>
-      <View style={layout.line} /><View style={[layout.row, { justifyContent: 'space-between', flexWrap: 'wrap' }]}><View style={[layout.row, { flex: 1 }]}><Ionicons name="shield-checkmark-outline" color={colors.green} size={20} /><Text style={[type.small, { flex: 1 }]}>Tus datos biométricos permanecen en tu teléfono.</Text></View><Button label="Cerrar sesión" icon="log-out-outline" variant="ghost" onPress={() => void signOut()} loading={busy} /></View>
+    {app.session ? <View style={[layout.row, { gap: 16 }]}>
+      <View style={styles.avatar}><Text style={styles.initial}>{name.slice(0, 1).toUpperCase()}</Text></View>
+      <View style={{ flex: 1, gap: 3 }}><Text style={type.heading}>{name}</Text><Text selectable style={type.small}>{app.session.user.email}</Text><Text style={type.small}>{app.premium ? 'Premium' : 'Cuenta gratuita'}</Text></View>
+    </View> : <View style={{ gap: 12 }}>
+      <Text style={type.body}>Guarda lugares y comparte los tuyos.</Text>
+      <Button label="Crear cuenta o iniciar sesión" icon="person-outline" onPress={() => router.push('/auth')} />
+    </View>}
+    <View style={styles.menu}>
+      <MenuRow title="Guardados" detail={app.session ? String(app.savedIds.length) : undefined} icon="bookmark-outline" onPress={() => router.push('/saved')} />
+      <MenuRow title="Actividad" detail={unread ? `${unread} sin leer` : undefined} icon="notifications-outline" onPress={() => router.push('/activity')} />
+      <MenuRow title="Premium" detail={app.premium ? 'Activo' : 'Galería y cualquier punto'} icon="sparkles-outline" onPress={() => router.push('/premium')} />
+    </View>
+    {app.session && <>
+      <View style={styles.menu}>
+        <MenuRow title="Editar nombre" icon="person-outline" expanded={section === 'name'} onPress={() => toggle('name')} />
+        {section === 'name' && <View style={styles.expanded}><ProfileEditor key={name} name={name} onSaved={() => setMessage('Tu nombre se actualizó.')} /></View>}
+        <MenuRow title="Alertas de lugares cercanos" icon="options-outline" expanded={section === 'alerts'} onPress={() => toggle('alerts')} />
+        {section === 'alerts' && <View style={styles.expanded}><NotificationPreferences key={`${app.notificationsEnabled}:${app.notificationRadius}`} initialEnabled={app.notificationsEnabled} initialRadius={app.notificationRadius} onSaved={setMessage} /></View>}
+        <MenuRow title="Mis publicaciones" detail={String(ownPlaces.length)} icon="location-outline" expanded={section === 'places'} onPress={() => toggle('places')} />
+        {section === 'places' && <View style={styles.expanded}>
+          {ownPlaces.length ? ownPlaces.map(place => <PlaceRow key={place.id} place={place} saved={app.savedIds.includes(place.id)} onSave={() => { void app.toggleSaved(place.id).catch(e => setError(errorMessage(e))); }} onOpen={() => router.push({ pathname: '/place/[id]', params: { id: place.id } })} onRetryPhoto={app.refresh} />) : <Text style={type.small}>Aún no has publicado. Puedes compartir un lugar desde Publicar.</Text>}
+        </View>}
+      </View>
+      <Button label="Cerrar sesión" icon="log-out-outline" variant="ghost" onPress={() => void signOut()} loading={busy} style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }} />
     </>}
+    {app.error && <Notice tone="error">{app.error}</Notice>}
+    {app.session && <Text style={type.small}>{app.connection === 'live' ? 'Sincronización en tiempo real activa' : app.connection === 'offline' ? 'Sin conexión. Volveremos a sincronizar al recuperar internet.' : 'Conectando con tus lugares…'}</Text>}
   </Page>;
 }
 
 const styles = StyleSheet.create({
-  avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.lime, alignItems: 'center', justifyContent: 'center' },
-  initial: { fontFamily: serif, fontSize: 36, color: colors.ink },
+  avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+  initial: { fontSize: 26, fontWeight: '600', color: colors.green },
+  menu: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  menuRow: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  menuTitle: { flex: 1, color: colors.ink, fontSize: 15, lineHeight: 22 },
+  expanded: { paddingTop: 8, paddingBottom: 18 },
 });

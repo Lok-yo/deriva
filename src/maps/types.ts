@@ -8,6 +8,8 @@ export type MapProps = {
   selected?: Coordinate | null;
   selectedId?: string | null;
   selectable?: boolean;
+  cameraRequest?: { id: number; center: Coordinate; zoom?: number };
+  edgeToEdge?: boolean;
   onSelectPlace?: (id: string) => void;
   onSelectCoordinate?: (coordinate: Coordinate) => void;
   style?: StyleProp<ViewStyle>;

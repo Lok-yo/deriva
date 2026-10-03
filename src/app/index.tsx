@@ -1,111 +1,134 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { chooseRandomPlace, distanceMeters } from '../domain/geo';
-import type { Category, Position } from '../domain/models';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { isPreviewPlace, SLRC_CENTER } from '../data/preview';
+import { distanceMeters, formatDistance } from '../domain/geo';
 import { MapView } from '../maps/MapView';
-import { getCurrentPosition } from '../services/sensors';
+import type { MapProps } from '../maps/types';
 import { useApp } from '../state/AppProvider';
-import { Button } from '../ui/Button';
-import { ExploreFilters } from '../ui/ExploreFilters';
-import { Badge, EmptyState, LoadingPlaces, Notice, errorMessage } from '../ui/Feedback';
-import { Page } from '../ui/Page';
-import { PlaceRow } from '../ui/PlaceRow';
-import { colors, layout, type } from '../ui/theme';
+import { Brand } from '../ui/AppShell';
+import { colors, type } from '../ui/theme';
 
 export default function Explore() {
   const app = useApp();
-  const { width } = useWindowDimensions();
-  const wide = width >= 1100;
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<Category | null>(null);
-  const [radius, setRadius] = useState(5);
-  const [position, setPosition] = useState<Position | null>(null);
-  const [busy, setBusy] = useState<'gps' | 'random' | 'refresh' | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const matching = useMemo(() => app.places.filter(p => (!category || p.category === category) && p.title.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es'))), [app.places, query, category]);
-  const visible = useMemo(() => matching.filter(p => !position || distanceMeters(position, p) <= radius * 1000).sort((a, b) => position ? distanceMeters(position, a) - distanceMeters(position, b) : 0), [matching, position, radius]);
-  const open = (id: string) => router.push({ pathname: '/place/[id]', params: { id } });
+  const location = app.mapLocation;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cameraRequest, setCameraRequest] = useState<NonNullable<MapProps['cameraRequest']>>({ id: 0, center: SLRC_CENTER, zoom: 12 });
+  const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const nextCamera = useRef(0);
+  const autoCenter = useRef(true);
+  const centerNextLocation = useRef(false);
+  const place = app.places.find(item => item.id === selectedId);
+  const notice = location.error ?? app.error;
+  const startMapLocation = app.startMapLocation;
+  const position = location.position;
+  useEffect(() => { void startMapLocation(); }, [startMapLocation]);
+  useEffect(() => {
+    if (position && (autoCenter.current || centerNextLocation.current)) {
+      setCameraRequest({ id: ++nextCamera.current, center: position, zoom: 15 });
+      autoCenter.current = false;
+      centerNextLocation.current = false;
+    }
+  }, [position]);
 
   async function locate() {
-    setBusy('gps'); setError(null);
-    try { setPosition(await getCurrentPosition()); } catch (e) { setError(errorMessage(e)); }
-    finally { setBusy(null); }
+    setDismissedError(null);
+    autoCenter.current = false;
+    centerNextLocation.current = true;
+    const result = await app.locateMap();
+    if (result.status === 'denied' && !result.canAskAgain && Platform.OS !== 'web') {
+      await Linking.openSettings().catch(() => {});
+    }
   }
-  async function surprise() {
-    setBusy('random'); setError(null);
-    try {
-      const origin = app.isPreview ? null : await getCurrentPosition();
-      if (origin) setPosition(origin);
-      const place = chooseRandomPlace(matching, origin, radius);
-      if (place) open(place.id);
-      else setError('No hay lugares con estos filtros dentro del radio elegido. Prueba un radio mayor.');
-    } catch (e) { setError(errorMessage(e)); }
-    finally { setBusy(null); }
+  function showExamples() {
+    autoCenter.current = false; centerNextLocation.current = false;
+    setSelectedId(null);
+    setCameraRequest({ id: ++nextCamera.current, center: SLRC_CENTER, zoom: 12 });
   }
-  async function save(id: string) {
-    if (!app.session || app.isPreview) { router.push('/auth'); return; }
-    try { await app.toggleSaved(id); } catch (e) { setError(errorMessage(e)); }
+  function surprise() {
+    if (!app.places.length) return;
+    const options = app.places.filter(item => item.id !== selectedId);
+    const choices = options.length ? options : app.places;
+    const chosen = choices[Math.floor(Math.random() * choices.length)];
+    autoCenter.current = false; centerNextLocation.current = false;
+    setSelectedId(chosen.id);
+    setCameraRequest({ id: ++nextCamera.current, center: chosen, zoom: 16 });
   }
-  async function refresh() {
-    setBusy('refresh'); setError(null);
-    try { await app.refresh(); } catch (e) { setError(errorMessage(e)); }
-    finally { setBusy(null); }
-  }
-  const results = <View style={styles.results}>
-    <View style={[layout.row, { justifyContent: 'space-between' }]}>
-      <Text accessibilityRole="header" style={type.heading}>{position ? 'Cerca de ti' : app.isPreview ? 'Lugares de ejemplo' : 'Por descubrir'}</Text>
-      <Text style={type.small}>{visible.length} {visible.length === 1 ? 'lugar' : 'lugares'}</Text>
-    </View>
-    {app.connection === 'connecting' && !app.places.length ? <LoadingPlaces /> : visible.length === 0 ? <EmptyState title="Todavía hay mucho por descubrir." body="No encontramos lugares con estos filtros. Amplía el radio o comparte el primero." action="Publicar un lugar" onAction={() => router.push('/publish')} /> : visible.map((place, index) => <PlaceRow key={place.id} place={place} index={index} distance={position ? distanceMeters(position, place) : undefined} saved={app.savedIds.includes(place.id)} onOpen={() => open(place.id)} onSave={() => void save(place.id)} onRetryPhoto={app.refresh} />)}
-  </View>;
-  const map = <View style={[styles.mapSection, wide && { flex: 1, height: '100%' }]}>
-    <MapView places={visible} origin={position} center={position} onSelectPlace={open} style={{ flex: 1 }} />
-    <View pointerEvents="none" style={styles.mapLabel}><Badge text={app.isPreview ? 'EXPLORA LOS EJEMPLOS' : 'UN PUNTO, UNA HISTORIA'} dark /></View>
-    <View style={styles.mapFootnote}><Ionicons name="location-outline" size={13} color={colors.green} /><Text style={[type.small, { fontSize: 11, flex: 1 }]}>{position ? `GPS activo · precisión ±${Math.round(position.accuracy)} m` : 'Activa tu ubicación cuando quieras descubrir lo cercano.'}</Text></View>
-  </View>;
 
-  return <Page style={width < 420 ? { padding: 20 } : undefined}>
-    <View style={[styles.intro, wide && { flexDirection: 'row', alignItems: 'flex-end' }]}>
-      <View style={{ gap: 12, flex: 1 }}>
-        <Text style={type.eyebrow}>SAL DE LO DE SIEMPRE</Text>
-        <Text accessibilityRole="header" style={[type.display, width < 600 && type.title]}>La próxima historia{wide ? '\n' : ' '}está cerca.</Text>
-        <Text style={[type.body, styles.subtitle]}>Rincones compartidos por personas curiosas. Elige uno o deja que el azar marque el rumbo.</Text>
-      </View>
-      <View style={{ gap: 8, alignSelf: wide ? 'flex-end' : 'flex-start' }}>
-        <Button label="Sorpréndeme" icon="shuffle-outline" onPress={() => void surprise()} loading={busy === 'random'} disabled={!!busy || !matching.length} />
-        <Text style={[type.small, { fontSize: 11, textAlign: wide ? 'right' : 'left' }]}>{app.isPreview ? 'Una sorpresa entre los ejemplos' : 'El azar elige. Tú decides ir.'}</Text>
-      </View>
+  return <View style={styles.screen} testID="map-screen">
+    <MapView
+      places={app.places}
+      origin={position}
+      cameraRequest={cameraRequest}
+      selectedId={selectedId}
+      onSelectPlace={id => { autoCenter.current = false; centerNextLocation.current = false; setSelectedId(id); }}
+      edgeToEdge
+      style={styles.map}
+    />
+    <View pointerEvents="box-none" style={styles.top}>
+      <View style={styles.brand}><Brand small /></View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Ver ejemplos en San Luis Río Colorado" onPress={showExamples} style={({ pressed }) => [styles.examples, pressed && styles.pressed]}>
+        <Ionicons name="location-outline" size={17} color={colors.green} />
+        <Text style={styles.controlLabel}>SLRC</Text>
+        <Text style={styles.demoLabel}>Ejemplos</Text>
+      </Pressable>
     </View>
-    {error && <Notice tone="error">{error}</Notice>}
-    <View style={[styles.board, wide && styles.wideBoard]}>
-      {!wide && map}
-      <View style={[styles.panel, wide && styles.widePanel]}>
-        <ExploreFilters query={query} setQuery={setQuery} category={category} setCategory={setCategory} radius={radius} setRadius={setRadius} hasPosition={!!position} />
-        <View style={layout.wrap}>
-          <Button label={position ? 'Actualizar GPS' : 'Usar mi ubicación'} icon="locate-outline" variant="secondary" onPress={() => void locate()} loading={busy === 'gps'} disabled={!!busy} />
-          {!app.isPreview && <Button label="Actualizar" icon="refresh-outline" variant="ghost" onPress={() => void refresh()} loading={busy === 'refresh'} disabled={!!busy} />}
-        </View>
-        {wide && <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 8 }}>{results}</ScrollView>}
+    {notice && dismissedError !== notice && <View style={styles.notice} accessibilityLiveRegion="polite">
+      <Ionicons name="information-circle-outline" size={18} color={colors.ink} />
+      <Text style={[type.small, styles.noticeText]}>{notice}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cerrar aviso de ubicación" onPress={() => setDismissedError(notice)} style={styles.dismiss}>
+        <Ionicons name="close" size={20} color={colors.ink} />
+      </Pressable>
+    </View>}
+    <View pointerEvents="box-none" style={styles.bottom}>
+      <View pointerEvents="box-none" style={styles.controls}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Elegir un lugar al azar" disabled={!app.places.length} onPress={surprise} style={({ pressed }) => [styles.random, pressed && styles.pressed]}>
+          <Ionicons name="shuffle-outline" size={20} color={colors.green} />
+          <Text style={styles.controlLabel}>Al azar</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={location.status === 'denied' && !location.canAskAgain && Platform.OS !== 'web' ? 'Abrir ajustes de ubicación' : 'Centrar en mi ubicación'} accessibilityState={{ busy: location.status === 'locating', disabled: location.status === 'locating' }} disabled={location.status === 'locating'} onPress={() => void locate()} style={({ pressed }) => [styles.locate, pressed && styles.pressed]}>
+          {location.status === 'locating' ? <ActivityIndicator color={colors.green} /> : <Ionicons name="locate-outline" size={23} color={colors.green} />}
+        </Pressable>
       </View>
-      {wide && map}
+      {place ? <View style={styles.place} testID="selected-place">
+        <Pressable accessibilityRole="button" accessibilityLabel={`Ver ${place.title}`} onPress={() => router.push({ pathname: '/place/[id]', params: { id: place.id } })} style={({ pressed }) => [styles.placeContent, pressed && styles.pressed]}>
+          <View style={styles.placeText}>
+            <Text accessibilityRole="header" numberOfLines={2} style={styles.placeTitle}>{place.title}</Text>
+            <Text style={type.small}>{isPreviewPlace(place) ? 'Ejemplo local · SLRC' : place.authorName}{position ? ` · ${formatDistance(distanceMeters(position, place))}` : ''}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={21} color={colors.green} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Cerrar lugar seleccionado" onPress={() => setSelectedId(null)} style={styles.dismiss}>
+          <Ionicons name="close" size={21} color={colors.muted} />
+        </Pressable>
+      </View> : <View pointerEvents="none" style={styles.hint}>
+        <Text style={styles.hintText}>{location.status === 'locating' ? 'Buscando tu ubicación…' : position ? 'Toca un punto para descubrirlo' : 'Explora SLRC o activa tu ubicación'}</Text>
+      </View>}
     </View>
-    {!wide && results}
-    {app.isPreview && <View style={styles.previewFooter}><Text style={[type.small, { flex: 1 }]}>Estás viendo lugares de ejemplo. Crea tu cuenta para descubrir y compartir con la comunidad.</Text><Button label="Unirme a Deriva" variant="secondary" icon="arrow-forward-outline" onPress={() => router.push('/auth')} /></View>}
-  </Page>;
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  intro: { gap: 20 },
-  subtitle: { color: colors.muted, maxWidth: 460 },
-  board: { gap: 24 },
-  wideBoard: { flexDirection: 'row', height: 620, gap: 28 },
-  panel: { gap: 16 },
-  widePanel: { width: 348 },
-  mapSection: { height: 360, position: 'relative' },
-  mapLabel: { position: 'absolute', top: 18, left: 18 },
-  mapFootnote: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: 10 },
-  results: { gap: 4 },
-  previewFooter: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16, borderTopWidth: 1, borderColor: colors.border, paddingTop: 20 },
+  screen: { flex: 1, minHeight: 0, backgroundColor: colors.soft },
+  map: { flex: 1 },
+  top: { position: 'absolute', top: 16, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  brand: { paddingHorizontal: 13, minHeight: 48, backgroundColor: colors.surface, borderRadius: 14, justifyContent: 'center', boxShadow: '0px 2px 8px #20332B14' },
+  examples: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.surface, boxShadow: '0px 2px 8px #20332B14' },
+  controlLabel: { color: colors.green, fontWeight: '600', fontSize: 14, lineHeight: 20 },
+  demoLabel: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  notice: { position: 'absolute', top: 76, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 12, paddingVertical: 3, borderRadius: 12, backgroundColor: colors.surface, boxShadow: '0px 2px 8px #20332B14' },
+  noticeText: { flex: 1, color: colors.ink, fontSize: 13, lineHeight: 19 },
+  dismiss: { width: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  bottom: { position: 'absolute', bottom: 16, left: 16, right: 16, gap: 10 },
+  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  random: { minHeight: 48, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: colors.surface, borderRadius: 24, boxShadow: '0px 2px 8px #20332B14' },
+  locate: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderRadius: 24, boxShadow: '0px 2px 8px #20332B14' },
+  place: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 16, boxShadow: '0px 3px 12px #20332B1C' },
+  placeContent: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 86, paddingLeft: 16, paddingVertical: 14, gap: 12 },
+  placeText: { flex: 1, gap: 5 },
+  placeTitle: { color: colors.ink, fontWeight: '600', fontSize: 17, lineHeight: 23 },
+  hint: { alignItems: 'center', alignSelf: 'center', maxWidth: '100%', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.surface, borderRadius: 14 },
+  hintText: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  pressed: { opacity: 0.7 },
 });

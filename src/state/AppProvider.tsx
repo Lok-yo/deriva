@@ -3,7 +3,8 @@ import { AppState as NativeAppState } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import type { AppNotification, ConnectionState, Place, Profile, PurchaseOption } from '../domain/models';
 import type { AppState } from './contracts';
-import { previewPlaces } from '../data/preview';
+import { isPreviewPlace, previewPlaces } from '../data/preview';
+import { useMapLocation } from './useMapLocation';
 import { validatePublication } from '../domain/publication';
 import { friendlyError, requireSessionFor, requireSupabase, supabase } from '../services/supabase';
 import { ensureProfile, fetchPlaces, publishPlace } from '../services/places';
@@ -19,6 +20,7 @@ export function useApp(): AppState {
 }
 
 export function AppProvider({ children }: React.PropsWithChildren) {
+  const navigationLocation = useMapLocation();
   const [ready, setReady] = useState(!supabase);
   const [session, setSession] = useState<Session | null>(null);
   const sessionRef = useRef<Session | null>(null);
@@ -158,10 +160,11 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   };
   const value: AppState = {
     ready, session, profile: belongsToSession ? profile : null, isPreview: !session,
-    places: !session ? previewPlaces : belongsToSession ? places : [],
+    places: belongsToSession ? [...previewPlaces, ...places] : previewPlaces,
     savedIds: belongsToSession ? savedIds : [], notifications: belongsToSession ? notifications : [],
     premium, connection: session ? connection : 'preview', error,
     notificationsEnabled: belongsToSession && notificationsEnabled, notificationRadius, purchaseOptions, refresh,
+    mapLocation: navigationLocation.location, startMapLocation: navigationLocation.start, locateMap: navigationLocation.locate,
     signIn: (email, password) => handle(async () => {
       const result = await requireSupabase().auth.signInWithPassword({ email: email.trim(), password });
       if (result.error) throw result.error;
@@ -186,6 +189,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       } finally { if (signingOutUser.current === user.id) signingOutUser.current = null; }
     }),
     toggleSaved: id => handle(async () => {
+      if (isPreviewPlace(id)) throw new Error('Este lugar es un ejemplo local y no se puede guardar en tu cuenta.');
       const user = currentUser(); const client = requireSupabase();
       const result = savedIds.includes(id) ? await client.from('deriva_saved_places').delete().eq('user_id', user.id).eq('place_id', id) : await client.from('deriva_saved_places').upsert({ user_id: user.id, place_id: id }, { onConflict: 'user_id,place_id', ignoreDuplicates: true });
       if (result.error) throw result.error;
@@ -204,6 +208,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       return id;
     }),
     deletePlace: id => handle(async () => {
+      if (isPreviewPlace(id)) throw new Error('Los ejemplos locales no son publicaciones de tu cuenta.');
       const user = currentUser(); const client = requireSupabase();
       const removed = await client.from('deriva_places').delete().eq('id', id).eq('owner_id', user.id).select('photo_path').single();
       if (removed.error) throw removed.error;

@@ -16,7 +16,8 @@ export default function Saved() {
     try { await app.toggleSaved(id); } catch (e) { setError(errorMessage(e)); }
   }
   return <Page>
-    <PageHeading eyebrow="Tu colección de caminos" title="Para volver. O para ir." body="Guarda esos lugares que te llaman. La próxima aventura puede empezar aquí." action={<Button label="Explorar" icon="compass-outline" variant="secondary" onPress={() => router.navigate('/')} />} />
+    <Button label="Volver al perfil" icon="arrow-back-outline" variant="ghost" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onPress={() => router.canGoBack() ? router.back() : router.replace('/profile')} />
+    <PageHeading title="Guardados" />
     {error && <Notice tone="error">{error}</Notice>}
     {!app.session || app.isPreview ? <EmptyState title="Haz espacio para tus próximos destinos." body="Inicia sesión para guardar lugares y llevar tu colección contigo." icon="bookmark-outline" action="Crear cuenta o iniciar sesión" onAction={() => router.push('/auth')} /> : saved.length ? <View>{saved.map(place => <PlaceRow key={place.id} place={place} saved onSave={() => void remove(place.id)} onOpen={() => router.push({ pathname: '/place/[id]', params: { id: place.id } })} onRetryPhoto={app.refresh} />)}</View> : <EmptyState title="Tu mapa personal empieza con un lugar." body="Toca el marcador de guardado en cualquier hallazgo. Lo encontrarás aquí cuando quieras volver." icon="bookmark-outline" action="Encontrar un lugar" onAction={() => router.navigate('/')} />}
   </Page>;

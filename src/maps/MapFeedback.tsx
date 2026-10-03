@@ -8,7 +8,7 @@ export function MapFeedback({ state, retry }: { state: 'loading' | 'ready' | 'er
     <View pointerEvents={state === 'loading' ? 'none' : 'auto'} style={styles.overlay}>
       <View style={styles.box}>
         {state === 'loading' && <ActivityIndicator color={colors.green} />}
-        <Text style={[type.small, { textAlign: 'center' }]}>{state === 'loading' ? 'Abriendo el mapa…' : 'El mapa necesita conexión a internet. Puedes seguir usando la lista de lugares.'}</Text>
+        <Text style={[type.small, { textAlign: 'center' }]}>{state === 'loading' ? 'Abriendo el mapa…' : 'No pudimos cargar el mapa. Revisa tu conexión e inténtalo de nuevo.'}</Text>
         {state === 'error' && <Button label="Recargar mapa" variant="secondary" onPress={retry} icon="refresh-outline" />}
       </View>
     </View>

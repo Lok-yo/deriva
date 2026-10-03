@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import type { AppNotification, ConnectionState, Place, Profile, PublishDraft, PurchaseOption } from '../domain/models';
+import type { MapLocationState } from './mapLocationStore';
 
 export type AppState = {
   ready: boolean;
@@ -15,6 +16,9 @@ export type AppState = {
   notificationsEnabled: boolean;
   notificationRadius: number;
   purchaseOptions: PurchaseOption[];
+  mapLocation: MapLocationState;
+  startMapLocation(): Promise<MapLocationState>;
+  locateMap(): Promise<MapLocationState>;
   refresh(): Promise<void>;
   signIn(email: string, password: string): Promise<void>;
   signUp(name: string, email: string, password: string): Promise<{ needsEmailConfirmation: boolean }>;
