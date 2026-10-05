@@ -12,7 +12,7 @@ Verificación del 4 de octubre de 2026:
 
 | Comprobación | Resultado |
 | --- | --- |
-| TypeScript, ESLint y reglas de dominio/Stripe/sesión/mapas | Pasaron, 87/87 pruebas |
+| TypeScript, ESLint y reglas de dominio/Stripe/sesión/mapas | Pasaron, 92/92 pruebas |
 | Dependencias Expo | `expo install --check` correcto |
 | Paquetes Android, iOS y web | Exportados sin abrir Expo Go ni iniciar un servidor de desarrollo |
 | Interfaz auxiliar a 320, 390, 768 y 1440 px | Sin desbordamientos, errores de página/consola ni warnings de Supabase |
@@ -71,3 +71,21 @@ La verificación completa requiere abrir el Payment Link desde Expo Go; el ticke
 - [ ] En Expo Go, comprobar Actividad con una cuenta cuya zona ya exista. Activar push informa de la limitación sin registrar tokens ni simular avisos.
 
 Push remoto requiere una compilación propia, EAS y credenciales FCM/APNs. En esa fase, comprobar entrega visible en segundo plano, apertura del destino al tocarla, zona/radio y cierre de sesión. Un receipt de Expo confirma aceptación por APNs/FCM, no que una persona vio el aviso. [Notificaciones SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
+
+## Regreso de Stripe: aviso de montaje en Android
+
+El usuario completó el pago de prueba y vio el aviso `Can't perform a React state update on a component that hasn't mounted yet` al regresar de Stripe. La consulta del backend confirmó que la compra de 100 centavos USD está `available`, sin consumir. Este aviso no anula el pago: debe usarse el crédito existente para terminar la publicación, sin volver a cobrarlo.
+
+La pila `ContextNavigator → ExpoRoot` coincide con el [fallo de inicialización de enlaces de Expo Router #49378](https://github.com/expo/expo/issues/49378). La versión instalada y compatible con SDK 57, `expo-router 57.0.24`, todavía entrega el enlace inicial desde una promesa que empieza durante el render. Si resuelve antes de que el navegador se monte, intenta actualizar su estado demasiado pronto.
+
+`scripts/patch-expo-router.cjs` corrige el componente de la dependencia: guarda la referencia del enlace inicial hasta su primer efecto, conserva los enlaces posteriores y descarta callbacks después del desmontaje. También evita restaurar un enlace inicial que el navegador ya atendió. El parche se aplica automáticamente en `postinstall`, es idempotente y falla si cambia la estructura que espera, para exigir revisión al actualizar Expo Router. No oculta mensajes de LogBox ni modifica el cobro o los créditos.
+
+Las cinco pruebas nuevas ejecutan el componente compilado del SDK con ciclos de hooks controlados. Reproducen la escritura antes de montaje en el código original y comprueban que el parche la aplaza hasta el efecto; también cubren enlace síncrono, enlaces posteriores, resolución tardía tras desmontaje e idempotencia. Pasaron las cinco, TypeScript y ESLint; la suite completa pasó 92/92 pruebas y la exportación Android/iOS/web quedó en `verification/router-mount-export`. No sustituyen la comprobación del regreso real en Android.
+
+Para que Metro abandone la copia de la dependencia que tenía en caché, el usuario debe detener su servidor de Expo en la terminal y reiniciarlo personalmente desde la carpeta `deriva`:
+
+```sh
+npm start -- --clear
+```
+
+Después, abrir Deriva en Expo Go y terminar el punto con el pago ya disponible. Falta confirmar en el teléfono que regresar de Stripe ya no produce el aviso. La corrección no inicia ni detiene el servidor de Expo del usuario.

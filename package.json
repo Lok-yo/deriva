@@ -58,7 +58,8 @@
     "lint": "expo lint",
     "test": "tsx --test tests/*.test.ts",
     "export:web": "expo export --platform web",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "postinstall": "node scripts/patch-expo-router.cjs"
   },
   "private": true,
   "overrides": {
