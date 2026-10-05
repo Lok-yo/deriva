@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { HttpError } from '../supabase/functions/_shared/core.ts';
 import {
   checkoutBody, checkoutRequestId, checkoutReturnResponse, createStripeCheckout,
-  readStripeBody, stripeEventAction, stripeTestSecret, verifyStripeSignature,
+  paymentLinkCheckout, readStripeBody, stripeEventAction, stripeTestSecret, verifyStripeSignature,
 } from '../supabase/functions/_shared/stripe.ts';
 
 const userA = '76a814f7-3ebd-43fa-9baa-1ca759ae76dc';
@@ -154,4 +154,29 @@ test('volver del Checkout es informativo y no declara pago verificado', async ()
   assert.match(text, /comprobará el pago con el servidor/);
   assert.doesNotMatch(text, /pago confirmado|pago exitoso/i);
   assert.match(await checkoutReturnResponse(true).text(), /Pago cancelado/);
+});
+
+test('Payment Link resuelve identidad exclusivamente mediante ticket opaco y enlace configurado', () => {
+  const linked = session({ metadata: { application: 'deriva', deriva_kind: 'remote_point' }, payment_link: 'plink_Fixture', client_reference_id: requestId, created: Math.floor(now / 1000) });
+  assert.deepEqual(stripeEventAction(event('checkout.session.completed', linked), 'plink_Fixture'), {
+    type: 'link_purchase', ticketId: requestId, paymentLinkId: 'plink_Fixture', sessionId: 'cs_test_fixture', paymentIntentId: 'pi_fixture', createdAt: new Date(now).toISOString(), amountTotal: 100, currency: 'usd',
+  });
+  assert.deepEqual(stripeEventAction(event('checkout.session.completed', linked), 'plink_Other'), { type: 'ignore' });
+  for (const changes of [{ client_reference_id: 'userChosen' }, { amount_total: 101 }, { currency: 'eur' }, { created: null }, { created: -1 }, { created: Number.MAX_SAFE_INTEGER }, { status: 'open' }, { livemode: true }]) {
+    assert.throws(() => stripeEventAction(event('checkout.session.completed', { ...linked, ...changes }), 'plink_Fixture'), httpStatus(400));
+  }
+  assert.deepEqual(stripeEventAction(event('checkout.session.completed', { ...linked, payment_status: 'unpaid', payment_intent: null }), 'plink_Fixture'), { type: 'ignore' });
+});
+
+test('reembolso de Payment Link usa metadata estática sin UUIDs de usuario editables', () => {
+  const charge = { object: 'charge', livemode: false, metadata: { application: 'deriva', deriva_kind: 'remote_point' }, payment_intent: 'pi_fixture', currency: 'usd', amount: 100, amount_refunded: 100, status: 'succeeded', paid: true };
+  assert.equal(stripeEventAction(event('charge.refunded', charge), 'plink_Fixture').type, 'refund');
+});
+
+test('enlace servidor fija exactamente referencia del ticket y rechaza URL ajena', () => {
+  const ticket = { ticket_id: requestId, payment_link_id: 'plink_Fixture', url: 'https://buy.stripe.com/test_Fixture' };
+  const result = paymentLinkCheckout(ticket);
+  assert.equal(new URL(result.url).searchParams.get('client_reference_id'), requestId);
+  assert.equal(result.amount, 100);
+  for (const change of [{ ticket_id: 'uid' }, { url: 'https://evil.test/test_Fixture' }, { url: 'https://buy.stripe.com/live_Fixture' }, { url: 'https://buy.stripe.com/test_Fixture?amount=1' }]) assert.throws(() => paymentLinkCheckout({ ...ticket, ...change }), httpStatus(503));
 });

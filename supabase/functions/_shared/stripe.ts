@@ -1,7 +1,7 @@
 import { HttpError, isRecord, isUuid } from "./core.ts";
 import { fetchJson } from "./http.ts";
 
-export const STRIPE_API_VERSION = "2026-09-30.endive";
+export const STRIPE_API_VERSION = "2026-08-26.dahlia";
 export const REMOTE_POINT_AMOUNT = 100;
 export const REMOTE_POINT_CURRENCY = "usd";
 
@@ -49,7 +49,6 @@ export function checkoutBody(
   }
   const body = new URLSearchParams({
     mode: "payment",
-    "payment_method_types[0]": "card",
     "line_items[0][price_data][currency]": REMOTE_POINT_CURRENCY,
     "line_items[0][price_data][unit_amount]": String(REMOTE_POINT_AMOUNT),
     "line_items[0][price_data][product_data][name]":
@@ -252,9 +251,10 @@ export type StripeAction =
     amountRefunded: number;
     currency: string;
   }
+  | { type: "link_purchase"; ticketId: string; paymentLinkId: string; sessionId: string; paymentIntentId: string; createdAt: string; amountTotal: number; currency: string }
   | { type: "ignore" };
 
-export function stripeEventAction(payload: unknown): StripeAction {
+export function stripeEventAction(payload: unknown, paymentLinkId?: string): StripeAction {
   if (
     !isRecord(payload) || typeof payload.id !== "string" ||
     !/^evt_[A-Za-z0-9]+$/.test(payload.id) ||
@@ -277,9 +277,9 @@ export function stripeEventAction(payload: unknown): StripeAction {
     !isRecord(metadata) || metadata.application !== "deriva" ||
     metadata.deriva_kind !== "remote_point"
   ) return { type: "ignore" };
+  if (payload.type !== "charge.refunded" && object.payment_status !== "paid") return { type: "ignore" };
   if (
-    object.livemode !== false || !isUuid(metadata.deriva_user_id) ||
-    !isUuid(metadata.deriva_request_id) ||
+    object.livemode !== false ||
     object.currency !== REMOTE_POINT_CURRENCY ||
     typeof object.payment_intent !== "string" ||
     !/^pi_[A-Za-z0-9]+$/.test(object.payment_intent)
@@ -300,6 +300,22 @@ export function stripeEventAction(payload: unknown): StripeAction {
       currency: REMOTE_POINT_CURRENCY,
     };
   }
+  if (object.payment_link != null) {
+    // Signed fixed-price Payment Link sessions carry an opaque server ticket.
+    // Metadata is static: never authorize by a user ID copied into the link.
+    if (!paymentLinkId || object.payment_link !== paymentLinkId) return { type: "ignore" };
+    if (object.object !== "checkout.session" || typeof object.id !== "string" ||
+      !/^cs_test_[A-Za-z0-9]+$/.test(object.id) || object.mode !== "payment" ||
+      object.amount_total !== REMOTE_POINT_AMOUNT || !isUuid(object.client_reference_id) ||
+      !Number.isInteger(object.created) || (object.created as number) <= 0 || (object.created as number) > 253402300799) invalidEvent();
+    if (object.payment_status !== "paid") return { type: "ignore" };
+    if (object.status !== "complete") invalidEvent();
+    return { type: "link_purchase", ticketId: object.client_reference_id,
+      paymentLinkId, sessionId: object.id, paymentIntentId: object.payment_intent as string,
+      createdAt: new Date((object.created as number) * 1000).toISOString(),
+      amountTotal: REMOTE_POINT_AMOUNT, currency: REMOTE_POINT_CURRENCY };
+  }
+  if (!isUuid(metadata.deriva_user_id) || !isUuid(metadata.deriva_request_id)) invalidEvent();
   if (
     object.object !== "checkout.session" || typeof object.id !== "string" ||
     !/^cs_test_[A-Za-z0-9]+$/.test(object.id) ||
@@ -336,4 +352,17 @@ export function checkoutReturnResponse(cancelled: boolean): Response {
       },
     },
   );
+}
+
+export function paymentLinkCheckout(ticket: unknown) {
+  if (!isRecord(ticket) || !isUuid(ticket.ticket_id) || typeof ticket.payment_link_id !== "string" ||
+      !/^plink_[A-Za-z0-9]+$/.test(ticket.payment_link_id) || typeof ticket.url !== "string" ||
+      !/^https:\/\/buy\.stripe\.com\/test_[A-Za-z0-9]+$/.test(ticket.url)) {
+    throw new HttpError(503, "invalid_checkout", "No se pudo verificar el enlace de prueba de Stripe.");
+  }
+  const url = new URL(ticket.url);
+  url.searchParams.set("client_reference_id", ticket.ticket_id);
+  return { url: url.href, checkoutKind: "payment_link", requestId: ticket.ticket_id,
+    paymentLinkId: ticket.payment_link_id, amount: REMOTE_POINT_AMOUNT,
+    currency: REMOTE_POINT_CURRENCY, testMode: true as const };
 }

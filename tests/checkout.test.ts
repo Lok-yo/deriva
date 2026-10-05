@@ -16,3 +16,11 @@ test('checkout rechaza redirecciones fuera de Stripe o transporte inseguro', () 
     assert.throws(() => checkoutUrl({ ...checkout, url }), /enlace de pago/);
   }
 });
+
+const nonce = 'dc874f15-350c-4779-bf17-3b71ad62a7dd';
+const link = { checkoutKind: 'payment_link', url: `https://buy.stripe.com/test_Fixture?client_reference_id=${nonce}`, requestId: nonce, paymentLinkId: 'plink_Fixture', amount: 100, currency: 'usd', testMode: true };
+test('Payment Link exige referencia opaca igual al ticket y modo fijo de prueba', () => {
+  assert.equal(checkoutUrl(link), link.url);
+  for (const change of [{ amount: 1 }, { testMode: false }, { requestId: 'user_id' }, { paymentLinkId: 'cs_test_Fixture' }]) assert.throws(() => checkoutUrl({ ...link, ...change }));
+  for (const url of [`https://buy.stripe.com/Fixture?client_reference_id=${nonce}`, `https://buy.stripe.com/test_Fixture?client_reference_id=${nonce}&amount=1`, `https://buy.stripe.com/test_Fixture?client_reference_id=${nonce}&client_reference_id=${nonce}`, 'https://buy.stripe.com/test_Fixture?client_reference_id=wrong', `https://buy.stripe.com.evil.test/test_Fixture?client_reference_id=${nonce}`]) assert.throws(() => checkoutUrl({ ...link, url }));
+});

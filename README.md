@@ -13,7 +13,7 @@ npm start -- --clear
 
 Usa Expo Go compatible con SDK 57, conecta el teléfono a la misma red del equipo y escanea el QR. Si tu red bloquea la conexión, puedes usar `npm run start:tunnel`. No necesitas generar un APK. En otro equipo ejecuta primero `npm ci`.
 
-El `.env` local contiene la URL y clave publishable de Supabase y está excluido de Git. Para otro equipo usa `.env.example`. Las claves privadas de Stripe pertenecen exclusivamente a los secretos de Edge Functions.
+El `.env` local contiene la URL y clave publishable de Supabase y está excluido de Git. Para otro equipo usa `.env.example`. El secreto de firma de Stripe permanece cifrado en Supabase Vault; Expo no recibe claves privadas.
 
 ## Publicar
 
@@ -29,22 +29,13 @@ Tocar un espacio vacío muestra el precio antes de continuar al formulario. **St
 
 El rol de administrador de `lleonalmaza@gmail.com` ya está asignado y verificado. Se guarda en una tabla exclusiva de Deriva. Los usuarios no pueden concedérselo mediante su perfil, correo editable o metadatos. No otorga administración del proyecto Supabase ni del sistema de asistencia compartido.
 
-## Configurar Stripe de prueba
+## Stripe de prueba configurado
 
-La integración necesita dos secretos del servidor, configurados en [Edge Functions de Supabase](https://supabase.com/dashboard/project/kqabddlasmvipuskvnvr/functions/secrets):
+La cuenta **New business** (`acct_1QuHMoK6FTj0u2Hi`) tiene un precio único de 100 centavos USD y un Payment Link de prueba. La app solicita al servidor un ticket opaco ligado a la cuenta autenticada; Stripe recibe ese ticket mediante `client_reference_id`. Después del pago, regresa a Expo Go; el webhook firmado confirma el crédito. No hace falta copiar claves API secretas ni guardarlas en Expo.
 
-- `DERIVA_STRIPE_TEST_SECRET_KEY`: clave `sk_test_…` de tu cuenta Stripe.
-- `DERIVA_STRIPE_WEBHOOK_SECRET`: secreto `whsec_…` del endpoint de prueba.
+El enlace y el webhook se configuran mediante RPC exclusivas del servicio. El secreto de firma está cifrado en Supabase Vault y solo lo puede consultar el backend. El destino de eventos usa API `2026-08-26.dahlia`, con `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `charge.refunded`.
 
-Crea un destino de eventos de prueba en Stripe con esta dirección:
-
-```text
-https://kqabddlasmvipuskvnvr.supabase.co/functions/v1/deriva-stripe-webhook
-```
-
-Activa `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `charge.refunded`. La integración usa la versión de API indicada en `supabase/functions/_shared/stripe.ts`. No requiere crear un producto manualmente: el servidor fija el importe en 100 centavos USD. Rechaza claves y eventos de modo real.
-
-Hasta configurar esos secretos, el flujo muestra un error claro y no concede publicaciones pagadas. La publicación local y el acceso del administrador funcionan sin Stripe. Consulta la [guía del backend](supabase/README.md) para despliegue y pruebas. [Documentación oficial de Checkout](https://docs.stripe.com/checkout/quickstart), [confirmación mediante webhook](https://docs.stripe.com/checkout/fulfillment).
+La prueba con tarjeta desde un teléfono sigue pendiente. Consulta [cómo probar el pago](docs/stripe-pruebas.md) y la [guía del backend](supabase/README.md). La publicación local y el administrador funcionan sin realizar un pago.
 
 ## Mapa y sensores
 

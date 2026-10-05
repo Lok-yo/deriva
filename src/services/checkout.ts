@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import { checkoutUrl } from '../domain/checkout';
 import { requireSessionFor } from './supabase';
 
-export async function openRemoteCheckout(userId: string, requestId = Crypto.randomUUID(), isCurrent?: () => boolean): Promise<void> {
+export async function openRemoteCheckout(userId: string, requestId = Crypto.randomUUID(), isCurrent?: () => boolean, retryExpired = true): Promise<void> {
   const bound = await requireSessionFor(userId, isCurrent);
   const { data, error } = await bound.client.functions.invoke('deriva-remote-checkout', { body: { requestId } });
   if (error) {
@@ -13,6 +13,10 @@ export async function openRemoteCheckout(userId: string, requestId = Crypto.rand
       if (response.status === 409 && body?.code === 'remote_access_available') {
         await bound.assertCurrent();
         return;
+      }
+      if (response.status === 400 && body?.code === 'checkout_request_expired' && retryExpired) {
+        await bound.assertCurrent();
+        return openRemoteCheckout(userId, Crypto.randomUUID(), isCurrent, false);
       }
       if (typeof body?.error === 'string') throw new Error(body.error);
     }

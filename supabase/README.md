@@ -19,22 +19,17 @@ Las migraciones `20261003051749_deriva_initial.sql` y `20261005021423_deriva_rem
 
 ## Stripe de prueba y funciones
 
-El modelo actual cobra **1 USD por ubicación remota**, sin suscripciones. Checkout y el webhook están desplegados. Falta configurar las claves del entorno de prueba para completar una compra; el endpoint del webhook responde `503 / stripe_webhook_not_configured` mientras falta su secreto. La publicación local y el administrador no dependen de Stripe.
+El modelo actual cobra **1 USD por ubicación remota**, sin suscripciones. Stripe de prueba está provisionado en **New business** mediante un precio fijo y Payment Link. No necesita una clave API secreta para abrir los pagos: el backend autentica al usuario, crea un ticket opaco y agrega su referencia al enlace de prueba.
 
-| Secreto del servidor | Uso |
-| --- | --- |
-| `DERIVA_STRIPE_TEST_SECRET_KEY` | Clave Stripe `sk_test_…`; las claves reales se rechazan |
-| `DERIVA_STRIPE_WEBHOOK_SECRET` | Firma `whsec_…` del endpoint de prueba |
-| `EXPO_ACCESS_TOKEN` | Opcional, si habilitas seguridad adicional en Expo Push Service |
+La migración `20261005030841_deriva_payment_link_tickets.sql` agrega configuración y tickets en `deriva_private`. Las RPC `deriva_configure_payment_link`, `deriva_payment_link_config`, `deriva_checkout_ticket` y `deriva_record_payment_link_purchase` son exclusivas del servicio. El secreto `whsec_…` se guarda cifrado en Vault, nunca en archivos ni en Expo. Los tickets duran 24 horas; se verifica cuándo Stripe creó el Checkout, permitiendo webhooks entregados tarde. Cada sesión pagada distinta concede un crédito y sus reintentos no lo duplican.
 
-Configúralos en el dashboard o en `supabase/.env.functions`, excluido de Git. El runtime proporciona `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; nunca se incluyen en Expo. [Secretos de funciones](https://supabase.com/docs/guides/functions/secrets).
+El runtime proporciona `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; nunca se incluyen en Expo. El webhook comprueba la firma antes de analizar JSON y admite exclusivamente pagos de prueba de 100 centavos USD en el enlace configurado.
 
 ```bash
-npx --yes supabase@2.119.0 secrets set --env-file supabase/.env.functions --project-ref TU_PROJECT_REF
-npx --yes supabase@2.119.0 functions deploy deriva-remote-checkout deriva-stripe-webhook deriva-push-worker --use-api --no-verify-jwt --project-ref TU_PROJECT_REF
+npx --yes supabase@2.119.0 functions deploy deriva-remote-checkout deriva-stripe-webhook --use-api --no-verify-jwt --project-ref TU_PROJECT_REF
 ```
 
-Solo despliega las funciones de Deriva. Las funciones usan `verify_jwt=false` porque autentican explícitamente antes de operar:
+`verify_jwt = false` permite las llamadas de Stripe; Checkout valida explícitamente el JWT mediante `auth.getUser`. La cuenta admin y los créditos ya disponibles evitan otro cobro.
 
 | Función | Autenticación |
 | --- | --- |
@@ -87,8 +82,8 @@ psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_remote_p
 
 La suite inicia una transacción y termina en `ROLLBACK`; revierte fixtures, tokens, derechos, ajustes de Storage y cambios del worker/cron. No la ejecutes fragmentada. Comprueba reglas de publicación, aislamiento de cuentas, Storage, privilegios, reintentos y autenticación de cron, incluyendo replay y expiración.
 
-Las dos suites pasaron en PostgreSQL alojado después de aplicar el nuevo modelo. Sus fixtures se revirtieron: quedaron un usuario real, cero lugares y cero compras, más el rol solicitado. Se comprobaron publicación local, admin, compra consumible, intentos de elevar privilegios, RLS, rollback, reintentos y reembolsos fuera de orden. La concurrencia está protegida con bloqueos transaccionales; estas suites no crean carreras físicas entre conexiones.
+Las tres suites pasaron en PostgreSQL alojado. Sus fixtures se revirtieron: el estado previo de dos usuarios, tres lugares y cero compras permaneció intacto, junto con el rol admin solicitado y la configuración real del Payment Link. Se comprobaron publicación local, admin, compra consumible, intentos de elevar privilegios, RLS, rollback, reintentos y reembolsos fuera de orden. La concurrencia está protegida con bloqueos transaccionales; estas suites no crean carreras físicas entre conexiones.
 
-Los dos endpoints Stripe pasaron Deno check y las pruebas unitarias de firma/pago. Los endpoints desplegados rechazan Checkout sin sesión, muestran un retorno informativo y fallan de forma explícita mientras falta el secreto de webhook. Una transacción completa de Stripe y los sensores siguen pendientes de las claves y del teléfono.
+Los dos endpoints Stripe pasaron Deno check y las pruebas unitarias de firma/pago. Los endpoints v3 rechazan Checkout sin sesión (401) y webhook sin firma (400); un evento sintético firmado e ignorable devolvió 200 sin conceder créditos. El retorno es informativo. Stripe y Vault están configurados para prueba. La transacción completa desde Expo Go y los sensores siguen pendientes de comprobar en un teléfono.
 
 El advisor reportó seis INFO por RLS sin políticas en tablas privadas/cola, deliberadamente inaccesibles a clientes, y el WARN preexistente de protección de contraseñas filtradas desactivada en Auth compartido. [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). No se cambiaron políticas de asistencia ni configuración compartida de Auth.

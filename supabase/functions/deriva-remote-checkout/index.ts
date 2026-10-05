@@ -9,7 +9,7 @@ import { corsHeaders, errorResponse, jsonResponse } from "../_shared/http.ts";
 import {
   checkoutRequestId,
   checkoutReturnResponse,
-  createStripeCheckout,
+  paymentLinkCheckout,
 } from "../_shared/stripe.ts";
 
 Deno.serve(async (request: Request) => {
@@ -72,19 +72,17 @@ Deno.serve(async (request: Request) => {
         "Ya puedes publicar este lugar sin otro pago. Vuelve a Deriva para continuar.",
       );
     }
-    const returnUrl = `${
-      Deno.env.get("SUPABASE_URL")
-    }/functions/v1/deriva-remote-checkout`;
-    return jsonResponse(
-      await createStripeCheckout(
-        data.user.id,
-        requestId,
-        returnUrl,
-        Deno.env.get("DERIVA_STRIPE_TEST_SECRET_KEY"),
-      ),
-      200,
-      true,
-    );
+    const ticket = await client.rpc("deriva_checkout_ticket", { p_user_id: data.user.id, p_request_id: requestId });
+    if (ticket.error) {
+      if (ticket.error.message.includes("remote_access_available")) {
+        throw new HttpError(409, "remote_access_available", "Ya puedes publicar sin otro pago. Vuelve a Deriva.");
+      }
+      if (ticket.error.message.includes("Checkout request expired")) {
+        throw new HttpError(400, "checkout_request_expired", "El enlace anterior venció. Inicia el pago de nuevo.");
+      }
+      throw new HttpError(503, "stripe_not_configured", "No se pudo abrir el pago de prueba. Vuelve al mapa e intenta de nuevo.");
+    }
+    return jsonResponse(paymentLinkCheckout(ticket.data), 200, true);
   } catch (error) {
     return errorResponse(error, true);
   }

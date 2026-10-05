@@ -1,29 +1,32 @@
 # Pagos de prueba de Deriva
 
-Cada pago habilita **una publicación remota por 1 USD**. No es una suscripción. Las publicaciones locales siguen siendo gratuitas y las cuentas con el rol de administrador de Deriva publican remotamente sin pagar. Un crédito disponible evita que el cliente y el servidor abran otro cobro innecesario.
+Cada pago habilita **una publicación remota por 1 USD**. Las publicaciones locales son gratuitas y el administrador de Deriva publica remotamente sin pagar. Un crédito disponible evita abrir otro cobro.
 
-## Configuración pendiente en Stripe y Supabase
+## Configuración
 
-1. En Stripe, activa el entorno de prueba y obtén su clave secreta `sk_test_…`.
-2. Guarda esa clave exclusivamente como secreto de las Edge Functions de Supabase con el nombre `DERIVA_STRIPE_TEST_SECRET_KEY`. Nunca la pongas en `.env` de Expo ni en una variable `EXPO_PUBLIC_*`.
-3. Crea en Stripe un destino de webhook **de prueba**, con API `2026-09-30.endive`, dirigido a:
-   `https://kqabddlasmvipuskvnvr.supabase.co/functions/v1/deriva-stripe-webhook`
-4. Selecciona `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `charge.refunded`. Guarda su secreto `whsec_…` en Supabase como `DERIVA_STRIPE_WEBHOOK_SECRET`.
-5. Abre la app con Expo Go por tu cuenta. Desde una cuenta sin rol admin ni crédito, toca un punto vacío, inicia Checkout y usa una tarjeta de prueba de Stripe (por ejemplo, `4242 4242 4242 4242`, fecha futura y CVC de tres dígitos).
-6. Vuelve a Expo Go. El webhook confirma el crédito y la app actualiza el acceso. Publicar el lugar consume un crédito; otro lugar remoto necesita otro pago.
+La cuenta de prueba **New business** (`acct_1QuHMoK6FTj0u2Hi`) contiene el precio `price_1UN2EfK6FTj0u2HihYAkVh0z`, Payment Link `plink_1UN2EpK6FTj0u2HiL3FSTIZy` y webhook `we_1UN2F6K6FTj0u2HiyGTGmTe3`. El webhook tiene API `2026-08-26.dahlia` y eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `charge.refunded`.
 
-Sin esos secretos el servicio devuelve un error de configuración. No simula compras exitosas. Las claves reales `sk_live_…` y eventos `livemode: true` se rechazan deliberadamente.
+El servidor guarda el enlace y el secreto de firma en configuración privada y **Supabase Vault**. No necesitas compartir una clave API ni agregar secretos a `.env` de Expo. El secreto del webhook tampoco aparece en este repositorio.
 
-## Contrato y verificación
+## Probar desde Expo Go
 
-- `POST deriva-remote-checkout`: JWT de usuario en `Authorization`, cuerpo `{ "requestId": "UUID" }`. Devuelve `{ url, sessionId, amount: 100, currency: "usd", testMode: true }`.
-- El servidor valida al usuario mediante Auth, fija importe y moneda y crea un Checkout de una sola compra. Stripe recibe una clave de idempotencia distinta por usuario y solicitud. Un reintento de red con el mismo UUID recupera la misma sesión durante la ventana de idempotencia de Stripe.
-- La respuesta `409 / remote_access_available` significa que el usuario ya es administrador o tiene un crédito disponible: la app debe actualizar su estado y continuar sin otro pago.
-- El retorno del navegador muestra texto y pide volver a Expo Go. Un parámetro de retorno nunca concede permisos ni confirma un pago.
-- Solo el webhook firmado registra compras. Verifica HMAC-SHA256 sobre el cuerpo original, una tolerancia de cinco minutos, modo de prueba, aplicación `deriva`, usuario, Checkout completo y pagado, importe exacto de 100 centavos y moneda USD.
-- El RPC de compra es exclusivo del servidor. Sesión de Checkout y PaymentIntent son únicos. Repetir un evento no multiplica créditos; la publicación los consume atómicamente. Un reembolso exitoso parcial o total invalida el crédito, incluso si el aviso de reembolso llega antes que el de compra.
-- El reembolso de un crédito ya utilizado no borra automáticamente el lugar publicado. Se conserva el historial de consumo.
+1. Inicia Expo por tu cuenta y abre Deriva en el teléfono.
+2. Inicia sesión con una cuenta sin rol admin ni crédito disponible. Toca un punto vacío y elige publicar allí por 1 USD.
+3. Abre el pago desde Deriva y usa la tarjeta de prueba `4242 4242 4242 4242`, fecha futura y CVC de tres dígitos. No se realizan cargos reales.
+4. Regresa a Expo Go. El webhook confirma el crédito y la app actualiza el acceso.
+5. Publicar consume un crédito. Otro punto remoto necesita otro pago; un crédito disponible evita un cobro adicional.
 
-Las pruebas automatizadas cubren firmas alteradas, replay, rotación de secreto, límite de bytes, mezcla entre cuentas, importes, modo real, respuestas de Checkout ajenas, retorno sin confirmación y reembolsos. La prueba integral con tarjeta requiere configurar Stripe y usar un teléfono; un build o test local no sustituye esa verificación.
+La prueba integral en un teléfono sigue pendiente: provisionar Stripe o pasar pruebas automatizadas no sustituye esa comprobación.
 
-Fuentes oficiales: [crear Checkout](https://docs.stripe.com/api/checkout/sessions/create), [firmas y eventos](https://docs.stripe.com/webhooks), [idempotencia](https://docs.stripe.com/api/idempotent_requests), [versiones de API](https://docs.stripe.com/api/versioning), [autenticación de Edge Functions](https://supabase.com/docs/guides/functions/auth).
+## Contrato y seguridad
+
+- `POST deriva-remote-checkout`: JWT en `Authorization`, cuerpo `{ "requestId": "UUID" }`. Devuelve `{ url, checkoutKind: "payment_link", requestId: "UUID opaco", paymentLinkId, amount: 100, currency: "usd", testMode: true }`.
+- El servidor obtiene la cuenta mediante Auth y genera un ticket opaco para `client_reference_id`. El cliente no elige el dueño de una compra. Reintentos del mismo usuario y solicitud recuperan el ticket; otra cuenta obtiene otro. Un ticket vencido se renueva una vez desde la app.
+- `409 / remote_access_available` indica que ya hay crédito o rol admin. La app vuelve a consultar acceso y continúa sin otro pago.
+- Solo el webhook firmado registra compras: HMAC-SHA256 sobre bytes originales, tolerancia de cinco minutos, modo de prueba, metadata de Deriva, enlace configurado, ticket válido, Checkout completo y pagado, importe exacto y USD. Métodos asíncronos pendientes no conceden crédito.
+- La validez de 24 horas se aplica al momento de creación del Checkout, no al de entrega del webhook. Una entrega retrasada de un pago válido puede confirmarse.
+- Cada sesión pagada distinta otorga un crédito, aunque reutilice un ticket. Checkout y PaymentIntent son únicos: reintentar el mismo evento no multiplica créditos. Publicar consume uno atómicamente.
+- Reembolsos parciales o totales invalidan el crédito. Si llegan antes del aviso de compra, una marca persistente impide recrearlo. Un crédito consumido conserva su historial; el reembolso no borra automáticamente el lugar.
+- Las RPC de configuración, tickets y pagos son exclusivas del servicio. Ni clientes autenticados ni anónimos pueden leer el secreto o generar créditos. El retorno del navegador nunca confirma un pago.
+
+Fuentes oficiales: [referencias de Payment Links](https://docs.stripe.com/payment-links/url-parameters), [firmas de webhook](https://docs.stripe.com/webhooks), [Supabase Vault](https://supabase.com/docs/guides/database/vault).
