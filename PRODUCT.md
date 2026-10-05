@@ -1,44 +1,27 @@
 # Deriva
 
-<!-- impeccable:product-schema 1 -->
+Aplicación React Native y Expo para teléfonos Android e iOS. La fase actual se abre en **Expo Go**, sin generar APK. El usuario inicia Expo; el agente no lo inicia ni deja servidores de desarrollo activos. La variante web sirve solo para verificación auxiliar.
 
-## Platform
+El mapa es la pantalla inicial y principal. Pide ubicación en primer plano y se centra en el GPS real; si falla, permite explorar SLRC sin fingir que esa es la ubicación del teléfono. Interfaz en español con fondo negro, controles simples y pins `?`.
 
-adaptive
+## Publicación
 
-Aplicación nativa para teléfonos Android e iOS con React Native y Expo. La prueba actual debe abrirse en **Expo Go**, sin generar un APK. La versión web es una herramienta auxiliar de desarrollo.
+- Publicar aquí es gratis: fotografía directa de cámara después de biometría, título y GPS actual.
+- Tocar un punto vacío propone agregar un lugar por **1 USD por publicación**, con cámara o galería. No hay suscripción.
+- El usuario eligió **Stripe en modo de prueba**, accesible desde Expo Go mediante Checkout en navegador. Solo el webhook firmado concede un crédito; la publicación lo consume atómicamente.
+- La cuenta `lleonalmaza@gmail.com` debe tener rol de administrador exclusivo de Deriva para publicar puntos remotos gratis. El cliente no decide quién es administrador.
+- No hay categorías. Los errores de validación se explican y el botón no permanece gris sin indicar el requisito pendiente.
 
-El usuario inicia el servidor de Expo; el agente no lo inicia ni lo deja activo durante verificaciones.
+## Exploración
 
-## Product Purpose
+Las fichas muestran foto y título. GPS y brújula son la acción principal arriba del detalle; no hay botones de navegación externa. Se conservan seis ejemplos locales de SLRC sin el botón «SLRC ejemplos» ni descripciones añadidas. Su procedencia permanece documentada, y no se insertan como publicaciones reales.
 
-Descubrir lugares y compartir puntos con fotografía y título. El mapa es la pantalla de entrada y el centro de la exploración: al abrir la app se solicita ubicación y, con permiso, se centra en el GPS del teléfono.
+Tres pestañas: Mapa, Publicar y Perfil. Perfil no muestra Guardados ni Premium. Las pestañas usan navegación real sin transiciones laterales.
 
-## Operating Context
+## Capacidades y límites
 
-Interfaz en español. El usuario pidió simplificar la app y añadir ejemplos en San Luis Río Colorado, Sonora (SLRC). Debe poder explorar sin iniciar sesión; publicar requiere una cuenta.
+Cámara, GPS, magnetómetro y biometría se usan por separado; no se almacenan datos biométricos. Supabase aporta cuenta, base de datos, fotos privadas y Realtime. Push y Face ID requieren una compilación propia en una fase posterior; no se simulan como disponibles en Expo Go.
 
-## Capabilities and Constraints
+Las verificaciones de software y backend se registran por separado de la ejecución en teléfonos. Se conservan tablas, políticas y triggers del sistema de asistencia que comparte Supabase.
 
-- Gratis: publicar en la ubicación actual, con fotografía tomada por la cámara después de autenticación biométrica.
-- Premium: elegir cualquier punto y utilizar fotografías de la galería. Los derechos los verifica el servidor; su compra real se habilitará posteriormente mediante RevenueCat y las tiendas.
-- Cuatro capacidades del teléfono: cámara, GPS, magnetómetro y biometría. No se almacena información biométrica.
-- Supabase proporciona cuenta, base de datos, fotografías privadas y sincronización en tiempo real. La integración de push está preparada para una compilación propia.
-- Expo Go permite explorar y probar cuenta, datos y sensores admitidos. Las compras y push remoto permanecen desactivados. Face ID en iOS requiere una compilación propia.
-- Los ejemplos de SLRC son contenido local identificado como ejemplo. No crean usuarios ni publicaciones en Supabase, y sus coordenadas nunca sustituyen una lectura de GPS.
-
-## Brand Commitments
-
-Nombre confirmado: **Deriva**. El usuario pidió una experiencia sencilla centrada en el mapa; no eligió una paleta ni una tipografía específica.
-
-## Evidence on Hand
-
-El backend conectado y las reglas de acceso cuentan con verificaciones previas documentadas en [aceptación](docs/acceptance.md). Esas pruebas no demuestran el comportamiento del mapa nativo ni de sensores físicos. Los ejemplos usan lugares públicos de SLRC con fuentes en el [README](README.md#ejemplos-de-slrc); sus marcadores son referencias aproximadas, no accesos verificados.
-
-## Product Principles
-
-1. Abrir directamente la exploración en el mapa.
-2. Pedir permisos con un propósito claro y permitir seguir explorando cuando se rechazan.
-3. Mostrar detalles y funciones secundarias cuando el usuario los solicita.
-4. Distinguir ejemplos, datos reales y ubicación del teléfono.
-5. Mantener las reglas de Gratis/Premium y la biometría al simplificar la interfaz.
+Para trabajar en este proyecto, el usuario prohibió utilizar skills de `.agents/skills`. Se pueden utilizar instrucciones y herramientas propias de Codex.

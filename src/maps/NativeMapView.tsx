@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import NativeMap, { Marker } from 'react-native-maps';
-import { isPreviewPlace } from '../data/preview';
 import { colors } from '../ui/theme';
 import { cameraRegion, mapCamera } from './camera';
 import { mapStyles } from './MapFeedback';
 import type { MapProps } from './types';
 
-/** Phones use their native map, included in Expo Go. */
+const darkMap = [
+  { elementType: 'geometry', stylers: [{ color: '#202824' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#202824' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#A5B5AA' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#3F4B43' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#182F3B' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#253D2C' }] },
+];
+
+/** iOS and development builds; Android Expo Go uses EmbeddedMapView. */
 export function NativeMapView(props: MapProps) {
   const map = useRef<NativeMap>(null);
   const [ready, setReady] = useState(false);
@@ -25,6 +33,8 @@ export function NativeMapView(props: MapProps) {
       testID="native-map"
       style={StyleSheet.absoluteFill}
       initialRegion={initialRegion}
+      userInterfaceStyle="dark"
+      customMapStyle={darkMap}
       onMapReady={() => setReady(true)}
       onPress={event => { if (props.selectable && event.nativeEvent.action !== 'marker-press') props.onSelectCoordinate?.(event.nativeEvent.coordinate); }}
       showsCompass={false}
@@ -40,10 +50,10 @@ export function NativeMapView(props: MapProps) {
         key={place.id}
         identifier={place.id}
         coordinate={place}
-        accessibilityLabel={`${place.title}${isPreviewPlace(place) ? ', ejemplo en San Luis Río Colorado' : ''}`}
-        pinColor={place.id === props.selectedId ? colors.green : isPreviewPlace(place) ? '#7B8F68' : colors.ink}
+        accessibilityLabel={place.title}
+        anchor={{ x: 0.5, y: 0.95 }}
         onPress={event => { event.stopPropagation(); props.onSelectPlace?.(place.id); }}
-      />)}
+      ><View style={[styles.pin, place.id === props.selectedId && styles.selectedPin]}><Text style={styles.question}>?</Text></View></Marker>)}
       {props.origin && <>
         <Marker coordinate={props.origin} anchor={{ x: 0.5, y: 0.5 }} zIndex={100} tracksViewChanges={false} accessibilityLabel="Tu ubicación">
           <View style={styles.origin} />
@@ -56,5 +66,8 @@ export function NativeMapView(props: MapProps) {
 
 const styles = StyleSheet.create({
   edgeToEdge: { borderRadius: 0, borderWidth: 0, minHeight: 0 },
+  pin: { width: 36, height: 36, borderRadius: 18, borderBottomLeftRadius: 5, transform: [{ rotate: '-45deg' }], backgroundColor: colors.lime, borderWidth: 3, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  selectedPin: { backgroundColor: colors.ink, borderColor: colors.lime },
+  question: { color: colors.onAccent, fontWeight: '800', fontSize: 20, lineHeight: 25, transform: [{ rotate: '45deg' }] },
   origin: { width: 19, height: 19, borderRadius: 10, backgroundColor: '#3979D5', borderWidth: 3, borderColor: colors.white },
 });

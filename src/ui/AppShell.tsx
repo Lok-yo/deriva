@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSegments, type Tabs } from 'expo-router';
 import { CommonActions } from 'expo-router/react-navigation';
+import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../state/AppProvider';
@@ -21,6 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   return <View style={[styles.shell, { paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right, paddingBottom: segments[0] === '(tabs)' ? 0 : insets.bottom }]}>
+    <StatusBar style="light" />
     <View style={styles.route}>{children}</View>
   </View>;
 }

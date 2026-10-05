@@ -42,15 +42,13 @@ export default function Profile() {
     {message && <Notice tone="success">{message}</Notice>}
     {app.session ? <View style={[layout.row, { gap: 16 }]}>
       <View style={styles.avatar}><Text style={styles.initial}>{name.slice(0, 1).toUpperCase()}</Text></View>
-      <View style={{ flex: 1, gap: 3 }}><Text style={type.heading}>{name}</Text><Text selectable style={type.small}>{app.session.user.email}</Text><Text style={type.small}>{app.premium ? 'Premium' : 'Cuenta gratuita'}</Text></View>
+      <View style={{ flex: 1, gap: 3 }}><Text style={type.heading}>{name}</Text><Text selectable style={type.small}>{app.session.user.email}</Text><Text style={type.small}>{app.isAdmin ? 'Administrador' : 'Cuenta personal'}</Text></View>
     </View> : <View style={{ gap: 12 }}>
-      <Text style={type.body}>Guarda lugares y comparte los tuyos.</Text>
+      <Text style={type.body}>Comparte lugares y encuentra nuevos destinos.</Text>
       <Button label="Crear cuenta o iniciar sesión" icon="person-outline" onPress={() => router.push('/auth')} />
     </View>}
     <View style={styles.menu}>
-      <MenuRow title="Guardados" detail={app.session ? String(app.savedIds.length) : undefined} icon="bookmark-outline" onPress={() => router.push('/saved')} />
       <MenuRow title="Actividad" detail={unread ? `${unread} sin leer` : undefined} icon="notifications-outline" onPress={() => router.push('/activity')} />
-      <MenuRow title="Premium" detail={app.premium ? 'Activo' : 'Galería y cualquier punto'} icon="sparkles-outline" onPress={() => router.push('/premium')} />
     </View>
     {app.session && <>
       <View style={styles.menu}>

@@ -1,16 +1,17 @@
 import { StyleSheet } from 'react-native';
 
 export const colors = {
-  background: '#F7F8F5',
-  surface: '#FFFFFF',
-  ink: '#20332B',
-  muted: '#5D6C64',
-  green: '#2E674B',
-  lime: '#DDEBD7',
-  border: '#DDE3DC',
-  soft: '#EBF1E8',
-  error: '#9C3F32',
-  errorSurface: '#F8EBE4',
+  background: '#090B0C',
+  surface: '#15181A',
+  ink: '#F1F4F2',
+  muted: '#ACB5B1',
+  green: '#C5ED95',
+  lime: '#C5ED95',
+  onAccent: '#142015',
+  border: '#303735',
+  soft: '#222826',
+  error: '#FFACA4',
+  errorSurface: '#36211F',
   white: '#FFFFFF',
 };
 
@@ -31,5 +32,5 @@ export const layout = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   line: { height: 1, backgroundColor: colors.border },
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 20, gap: 16 },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 18, padding: 20, gap: 16 },
 });

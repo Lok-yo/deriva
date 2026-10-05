@@ -1,15 +1,25 @@
 import { distanceMeters, isCoordinate } from './geo';
-import type { Position, PublishDraft } from './models';
+import type { Coordinate, Position, PublicationAccess, PublicationInput, PublishDraft } from './models';
 
-export function validatePublication(draft: PublishDraft, premium: boolean, gps: Position | null, now = Date.now()): PublishDraft {
+export function resolvePublicationDraft(input: PublicationInput, gps: Position | null): PublishDraft {
+  if (input.mode === 'local') {
+    if (!gps) throw new Error('Activa el GPS para publicar desde donde estás.');
+    return { ...input, latitude: gps.latitude, longitude: gps.longitude };
+  }
+  if (typeof input.latitude !== 'number' || typeof input.longitude !== 'number' || !isCoordinate({ latitude: input.latitude, longitude: input.longitude })) throw new Error('Elige un punto en el mapa para publicar.');
+  return { ...input, latitude: input.latitude, longitude: input.longitude };
+}
+
+export function validatePublication(draft: PublishDraft, access: PublicationAccess, gps: Position | null, now = Date.now()): PublishDraft {
   const title = draft.title.trim();
   if (title.length < 3 || title.length > 80) throw new Error('El título debe tener entre 3 y 80 caracteres.');
   if (!isCoordinate(draft)) throw new Error('Las coordenadas no son válidas.');
-  if (!['naturaleza', 'urbano', 'misterio'].includes(draft.category)) throw new Error('Elige una categoría válida.');
+  if (!['local', 'remote'].includes(draft.mode)) throw new Error('Elige cómo publicar el lugar.');
   if (!draft.photo?.uri || !['camera', 'gallery'].includes(draft.photo.source)) throw new Error('Agrega una foto del lugar.');
-  if (!premium && draft.photo.source !== 'camera') throw new Error('El plan gratuito requiere una foto de la cámara.');
+  if (draft.mode === 'remote' && !access.isAdmin && access.remoteCredits < 1) throw new Error('Para agregar una ubicación en otro lugar, paga 1 USD.');
+  if (draft.mode === 'local' && draft.photo.source !== 'camera') throw new Error('Publicar gratis desde aquí requiere una foto de la cámara.');
   if (draft.photo.source === 'camera' && !draft.photo.biometricVerified) throw new Error('Confirma tu identidad con biometría antes de tomar la foto.');
-  if (!premium) {
+  if (draft.mode === 'local') {
     if (!gps || !isCoordinate(gps)) throw new Error('Obtén tu ubicación con el GPS antes de publicar.');
     if (gps.mocked) throw new Error('No se permite una ubicación simulada.');
     if (!Number.isFinite(gps.accuracy) || gps.accuracy < 0 || gps.accuracy > 100) throw new Error('La precisión del GPS debe ser de 100 metros o menos. Intenta al aire libre.');
@@ -18,4 +28,16 @@ export function validatePublication(draft: PublishDraft, premium: boolean, gps: 
     if (distanceMeters(gps, draft) > 100) throw new Error('Tu ubicación cambió. Actualiza el punto antes de publicar.');
   }
   return { ...draft, title };
+}
+
+export function publicationAccess(value: unknown): PublicationAccess {
+  const data = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  return { isAdmin: data.is_admin === true, remoteCredits: typeof data.remote_credits === 'number' && Number.isSafeInteger(data.remote_credits) && data.remote_credits > 0 ? data.remote_credits : 0 };
+}
+
+export function publicationTarget(params: { mode?: string | string[]; latitude?: string | string[]; longitude?: string | string[] }): { mode: PublishDraft['mode']; coordinate: Coordinate | null } {
+  if (params.mode !== 'remote') return { mode: 'local', coordinate: null };
+  if (typeof params.latitude !== 'string' || typeof params.longitude !== 'string' || !params.latitude.trim() || !params.longitude.trim()) return { mode: 'remote', coordinate: null };
+  const coordinate = { latitude: Number(params.latitude), longitude: Number(params.longitude) };
+  return { mode: 'remote', coordinate: isCoordinate(coordinate) ? coordinate : null };
 }

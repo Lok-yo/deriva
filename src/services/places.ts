@@ -1,6 +1,6 @@
 import type { Place, Position, Profile, PublishDraft } from '../domain/models';
 import { encodePhoto } from './photos';
-import { requireSupabase } from './supabase';
+import { requireSessionFor, requireSupabase } from './supabase';
 
 export async function fetchPlaces(extraIds: string[] = []): Promise<Place[]> {
   const client = requireSupabase();
@@ -52,14 +52,17 @@ export async function ensureProfile(userId: string, name: string): Promise<Profi
   return result.data as Profile;
 }
 
-export async function publishPlace(userId: string, draft: PublishDraft, gps: Position | null): Promise<string> {
-  const client = requireSupabase();
+export async function publishPlace(userId: string, draft: PublishDraft, gps: Position | null, isCurrent?: () => boolean): Promise<string> {
+  const bound = await requireSessionFor(userId, isCurrent);
+  const client = bound.client;
   const path = `${userId}/${draft.requestId}.jpg`;
   const bytes = await encodePhoto(draft.photo.uri);
+  await bound.assertCurrent();
   const uploaded = await client.storage.from('deriva-photos').upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
   if (uploaded.error && !/already exists|Duplicate/i.test(uploaded.error.message)) throw uploaded.error;
-  const result = await client.rpc('deriva_create_place', {
-    p_request_id: draft.requestId, p_title: draft.title, p_category: draft.category,
+  await bound.assertCurrent();
+  const result = await client.rpc('deriva_create_place_v2', {
+    p_request_id: draft.requestId, p_title: draft.title, p_mode: draft.mode,
     p_latitude: draft.latitude, p_longitude: draft.longitude, p_photo_path: path,
     p_photo_source: draft.photo.source, p_gps_latitude: gps?.latitude ?? null,
     p_gps_longitude: gps?.longitude ?? null, p_gps_accuracy: gps?.accuracy ?? null,

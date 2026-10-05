@@ -25,7 +25,7 @@ export function EmptyState({ title, body, icon = 'compass-outline', action, onAc
 }
 
 export function Badge({ text, dark = false }: { text: string; dark?: boolean }) {
-  return <View style={[styles.badge, dark && { backgroundColor: colors.ink }]}><Text style={[styles.badgeText, dark && { color: colors.lime }]}>{text}</Text></View>;
+  return <View style={[styles.badge, dark && { backgroundColor: colors.background }]}><Text style={styles.badgeText}>{text}</Text></View>;
 }
 
 export function LoadingPlaces() {

@@ -26,16 +26,16 @@ export function mapDocument(props: MapProps, bridge: string, transport: 'browser
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <style>
-html,body,#map{height:100%;width:100%;margin:0;background:#EBF1E8;font-family:system-ui,sans-serif}
-.leaflet-tile-pane{filter:saturate(.65)}
-.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.9)!important}
-.leaflet-control-attribution a{color:#2E674B}
-.pin{display:flex;align-items:center;justify-content:center;height:30px;width:30px;border-radius:50% 50% 50% 5px;transform:rotate(-45deg);background:#2E674B;border:3px solid #fff;box-shadow:0 2px 5px #20332B25}
-.pin span{transform:rotate(45deg);color:#fff;font-size:12px;font-weight:700}
-.pin.selected{background:#20332B;transform:rotate(-45deg) scale(1.16)}
-.origin{height:14px;width:14px;background:#3979D5;border:3px solid white;border-radius:50%;box-shadow:0 2px 5px #20332B25}
-.target{height:20px;width:20px;background:#DDEBD7;border:3px solid #2E674B;border-radius:50%}
-.leaflet-tooltip{background:#fff;color:#20332B;border:1px solid #DDE3DC;box-shadow:none;font-size:12px;padding:7px 10px}
+html,body,#map{height:100%;width:100%;margin:0;background:#171D1B;font-family:system-ui,sans-serif}
+.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.22) brightness(.85) contrast(.85)}
+.leaflet-control-attribution{font-size:9px!important;background:rgba(21,24,26,.94)!important;color:#ACB5B1!important}
+.leaflet-control-attribution a{color:#C5ED95}
+.pin{display:flex;align-items:center;justify-content:center;height:30px;width:30px;border-radius:50% 50% 50% 5px;transform:rotate(-45deg);background:#C5ED95;border:3px solid #15181A;box-shadow:0 2px 8px #0008}
+.pin span{transform:rotate(45deg);color:#142015;font-size:19px;font-weight:800;line-height:1}
+.pin.selected{background:#F1F4F2;border-color:#C5ED95;transform:rotate(-45deg) scale(1.16)}
+.origin{height:14px;width:14px;background:#669EFA;border:3px solid #F1F4F2;border-radius:50%;box-shadow:0 0 0 7px #669EFA25}
+.target{height:22px;width:22px;background:#15181A;border:3px solid #C5ED95;border-radius:50%;box-shadow:0 0 0 7px #C5ED9525}
+.leaflet-tooltip{background:#15181A;color:#F1F4F2;border:1px solid #303735;box-shadow:none;font-size:12px;padding:7px 10px}
 </style></head><body><div id="map" role="application" aria-label="Mapa de lugares"></div>
 <script>
 const data=${data};
@@ -54,12 +54,12 @@ tiles.on('load',()=>{if(loadedTiles>0){ready=true;clearTimeout(timeout);send({ty
 let current=data,lastCameraKey=null,origin=null,target=null;const markers=new Map();
 function update(next){
 current=next;
-const attribution=document.querySelector('.leaflet-control-attribution');if(attribution)attribution.style.marginBottom=next.edgeToEdge?'140px':'0';
+const attribution=document.querySelector('.leaflet-control-attribution');if(attribution)attribution.style.marginBottom=next.edgeToEdge?'1px':'0';
 const active=new Set(next.places.map(p=>p.id));
 markers.forEach((marker,id)=>{if(!active.has(id)){marker.remove();markers.delete(id);}});
-next.places.forEach((p,i)=>{
+next.places.forEach(p=>{
 if(!valid(p))return;
-const icon=L.divIcon({className:'',html:'<div class="pin '+(p.id===next.selectedId?'selected':'')+'"><span>'+String(i+1)+'</span></div>',iconSize:[36,36],iconAnchor:[18,34]});
+const icon=L.divIcon({className:'',html:'<div class="pin '+(p.id===next.selectedId?'selected':'')+'"><span>?</span></div>',iconSize:[36,36],iconAnchor:[18,34]});
 let marker=markers.get(p.id);
 if(!marker){marker=L.marker([p.latitude,p.longitude],{icon,title:p.title,keyboard:true}).addTo(map);marker.on('click',()=>send({type:'place',id:p.id}));markers.set(p.id,marker);}else{marker.setLatLng([p.latitude,p.longitude]);marker.setIcon(icon);}
 const label=document.createElement('span');label.textContent=p.title;marker.unbindTooltip().bindTooltip(label,{direction:'top',offset:[0,-24]});

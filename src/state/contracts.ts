@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import type { AppNotification, ConnectionState, Place, Profile, PublishDraft, PurchaseOption } from '../domain/models';
+import type { AppNotification, ConnectionState, Place, Profile, PublicationInput } from '../domain/models';
 import type { MapLocationState } from './mapLocationStore';
 
 export type AppState = {
@@ -10,12 +10,12 @@ export type AppState = {
   places: Place[];
   savedIds: string[];
   notifications: AppNotification[];
-  premium: boolean;
+  isAdmin: boolean;
+  remoteCredits: number;
   connection: ConnectionState;
   error: string | null;
   notificationsEnabled: boolean;
   notificationRadius: number;
-  purchaseOptions: PurchaseOption[];
   mapLocation: MapLocationState;
   startMapLocation(): Promise<MapLocationState>;
   locateMap(): Promise<MapLocationState>;
@@ -24,12 +24,10 @@ export type AppState = {
   signUp(name: string, email: string, password: string): Promise<{ needsEmailConfirmation: boolean }>;
   signOut(): Promise<void>;
   toggleSaved(id: string): Promise<void>;
-  publish(draft: PublishDraft): Promise<string>;
+  publish(draft: PublicationInput): Promise<string>;
   deletePlace(id: string): Promise<void>;
   markNotificationRead(id: string): Promise<void>;
   setNotificationPreferences(enabled: boolean, radiusKm: number): Promise<void>;
-  loadPurchaseOptions(): Promise<void>;
-  purchase(identifier: string): Promise<boolean>;
-  restorePurchases(): Promise<boolean>;
+  openRemoteCheckout(requestId?: string): Promise<void>;
   updateDisplayName(name: string): Promise<void>;
 };

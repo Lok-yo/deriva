@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useApp } from '../state/AppProvider';
+import { publicationTarget } from '../domain/publication';
 import { Button } from '../ui/Button';
 import { Notice, errorMessage } from '../ui/Feedback';
 import { Chip, Field } from '../ui/Forms';
@@ -11,6 +12,7 @@ import { colors, layout, type } from '../ui/theme';
 
 export default function Auth() {
   const app = useApp();
+  const params = useLocalSearchParams<{ returnTo?: string; mode?: string; latitude?: string; longitude?: string }>();
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -19,6 +21,12 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState(false);
+
+  function continueAfterAuth() {
+    if (params.returnTo !== 'publish') { router.replace('/'); return; }
+    const target = publicationTarget(params);
+    router.replace({ pathname: '/publish', params: { mode: target.mode, ...(target.coordinate ? { latitude: String(target.coordinate.latitude), longitude: String(target.coordinate.longitude) } : {}) } });
+  }
 
   async function submit() {
     if (busy) return;
@@ -32,17 +40,17 @@ export default function Auth() {
         const result = await app.signUp(name.trim(), email.trim().toLowerCase(), password);
         if (result.needsEmailConfirmation) { setConfirmation(true); setPassword(''); return; }
       } else { await app.signIn(email.trim().toLowerCase(), password); }
-      router.replace('/');
+      continueAfterAuth();
     } catch (e) { setError(errorMessage(e)); }
     finally { setBusy(false); }
   }
   return <Page keyboard>
     <Button label="Volver al mapa" icon="arrow-back-outline" variant="ghost" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onPress={() => router.navigate('/')} />
       <View style={{ gap: 16 }}>
-        {app.session ? <><Text accessibilityRole="header" style={type.title}>Ya estás en el camino.</Text><Text style={type.body}>Tu sesión está activa. Puedes explorar, publicar y guardar lugares.</Text><Button label="Empezar a explorar" icon="arrow-forward-outline" onPress={() => router.replace('/')} /></> : confirmation ? <><Ionicons name="mail-open-outline" size={40} color={colors.green} /><Text accessibilityRole="header" style={type.title}>Revisa tu correo.</Text><Text style={type.body}>Enviamos un enlace de confirmación a {email.trim()}. Ábrelo y después inicia sesión para entrar a Deriva.</Text><Button label="Ir a iniciar sesión" onPress={() => { setConfirmation(false); setMode('signin'); }} /><Button label="Volver a explorar" variant="ghost" onPress={() => router.replace('/')} /></> : <>
+        {app.session ? <><Text accessibilityRole="header" style={type.title}>Ya estás en el camino.</Text><Text style={type.body}>Tu sesión está activa. Puedes explorar y compartir lugares.</Text><Button label={params.returnTo === 'publish' ? 'Continuar publicación' : 'Empezar a explorar'} icon="arrow-forward-outline" onPress={continueAfterAuth} /></> : confirmation ? <><Ionicons name="mail-open-outline" size={40} color={colors.green} /><Text accessibilityRole="header" style={type.title}>Revisa tu correo.</Text><Text style={type.body}>Enviamos un enlace de confirmación a {email.trim()}. Ábrelo y después inicia sesión para entrar a Deriva.</Text><Button label="Ir a iniciar sesión" onPress={() => { setConfirmation(false); setMode('signin'); }} /><Button label="Volver a explorar" variant="ghost" onPress={() => router.replace('/')} /></> : <>
           <View style={layout.wrap}><Chip label="Crear cuenta" active={mode === 'signup'} onPress={() => { setMode('signup'); setError(null); }} /><Chip label="Iniciar sesión" active={mode === 'signin'} onPress={() => { setMode('signin'); setError(null); }} /></View>
           <Text accessibilityRole="header" style={type.title}>{mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
-          <Text style={type.small}>{mode === 'signup' ? 'Tu cuenta es gratuita. Premium es opcional.' : 'Tus lugares guardados te están esperando.'}</Text>
+          <Text style={type.small}>{mode === 'signup' ? 'Crea tu cuenta y publica gratis donde estás.' : 'Vuelve a explorar y compartir lugares.'}</Text>
           {error && <Notice tone="error">{error}</Notice>}
           {mode === 'signup' && <Field label="Tu nombre" value={name} onChangeText={setName} placeholder="¿Cómo te llamamos?" autoComplete="name" textContentType="name" maxLength={60} editable={!busy} />}
           <Field label="Correo electrónico" value={email} onChangeText={setEmail} placeholder="tucorreo@ejemplo.com" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" textContentType="emailAddress" editable={!busy} />

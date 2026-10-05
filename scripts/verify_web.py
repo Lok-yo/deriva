@@ -61,37 +61,58 @@ with sync_playwright() as playwright:
     expect(page.get_by_role('tab')).to_have_count(3)
     for label in ['Mapa', 'Publicar', 'Perfil']:
         expect(page.get_by_role('tab', name=label, exact=True)).to_be_visible()
-    page.get_by_role('button', name='Ver ejemplos en San Luis Río Colorado', exact=True).click()
+    expect(page.get_by_role('button', name='Ver ejemplos en San Luis Río Colorado', exact=True)).to_have_count(0)
     frame_element = home.locator('iframe').element_handle()
     frame = home.frame_locator('iframe')
     expect(frame.locator('.pin')).to_have_count(6, timeout=20000)
     expect(frame.locator('.origin')).to_have_count(1)
     map_bounds = home.locator('iframe').bounding_box()
     assert map_bounds, 'Map has no visible area'
-    for pin in frame.locator('.pin').all():
-        bounds = pin.bounding_box()
-        assert bounds and bounds['x'] >= map_bounds['x'] and bounds['y'] >= map_bounds['y'], bounds
-        assert bounds['x'] + bounds['width'] <= map_bounds['x'] + map_bounds['width'], bounds
-        assert bounds['y'] + bounds['height'] <= map_bounds['y'] + map_bounds['height'], bounds
-    report['map_interactions'].append('SLRC overview displays all six examples')
-    frame.locator('.pin').first.click()
+    assert frame.locator('.pin').all_text_contents() == ['?'] * 6
+    # The initial camera follows GPS; sample places may correctly be offscreen.
+    page.get_by_role('button', name='Elegir un lugar al azar', exact=True).click()
     selected = page.get_by_test_id('selected-place').filter(visible=True)
     expect(selected).to_be_visible()
     assert page.evaluate('(frame) => frame.isConnected', frame_element), 'Selecting a pin rebuilt the iframe'
     page.get_by_role('button', name='Cerrar lugar seleccionado', exact=True).click()
     expect(selected).to_have_count(0)
-    page.get_by_role('button', name='Elegir un lugar al azar', exact=True).click()
+    # Random selection centers one real marker. Tapping that marker must keep
+    # the same map document and must not open the empty-point payment prompt.
+    visible_pin = next(pin for pin in frame.locator('.pin').all() if (bounds := pin.bounding_box())
+                       and map_bounds['x'] <= bounds['x'] <= map_bounds['x'] + map_bounds['width'] - bounds['width']
+                       and map_bounds['y'] <= bounds['y'] <= map_bounds['y'] + map_bounds['height'] - bounds['height'])
+    visible_pin.click()
     expect(selected).to_be_visible()
+    expect(page.get_by_test_id('new-point-prompt')).to_have_count(0)
     selected.get_by_role('button', name=re.compile(r'^Ver ')).click()
     expect(page).to_have_url(re.compile(r'/place/demo-'))
-    expect(page.get_by_text(re.compile(r'^LUGAR DE EJEMPLO'))).to_be_visible()
+    expect(page.get_by_text(re.compile(r'^LUGAR DE EJEMPLO'))).to_have_count(0)
+    expect(page.get_by_role('button', name='Abrir navegación', exact=True)).to_have_count(0)
+    expect(page.get_by_role('button', name='Ver lugar en OpenStreetMap', exact=True)).to_have_count(0)
+    expect(page.get_by_role('button', name=re.compile(r'GPS'))).to_be_visible()
+    page.screenshot(path=str(output / 'detalle-390.png'))
     expect(page.get_by_role('tab')).to_have_count(0)
     report['routes'].append('map marker + random selection + example detail')
     report['map_interactions'].append('Selecting a place preserves the map iframe')
 
+    page.goto(args.url, wait_until='networkidle')
+    home = page.get_by_test_id('map-screen').filter(visible=True)
+    frame = home.frame_locator('iframe')
+    expect(frame.locator('.pin')).to_have_count(6, timeout=20000)
+    frame.locator('#map').click(position={'x': 90, 'y': 220})
+    prompt = page.get_by_test_id('new-point-prompt')
+    expect(prompt).to_be_visible()
+    expect(prompt.get_by_text('Agregar una ubicación aquí cuesta 1 USD.', exact=True)).to_be_visible()
+    page.screenshot(path=str(output / 'punto-remoto-390.png'))
+    prompt.get_by_role('button', name='Iniciar sesión para continuar', exact=True).click()
+    expect(page).to_have_url(re.compile(r'/publish\?.*mode=remote'))
+    report['map_interactions'].append('Empty map point offers one remote publication for 1 USD')
+
     for path in ['/publish', '/saved', '/activity', '/profile', '/premium', '/auth']:
         page.goto(args.url + path, wait_until='networkidle')
-        expect(page.get_by_role('tab')).to_have_count(3 if path in ['/publish', '/profile'] else 0)
+        expect(page.get_by_role('tab')).to_have_count(3 if path in ['/publish', '/profile', '/premium'] else 0)
+        if path == '/premium':
+            expect(page).to_have_url(args.url + '/')
         assert 'Volvamos al camino.' not in page.locator('body').inner_text(), path
         report['routes'].append(path)
 
@@ -117,7 +138,8 @@ with sync_playwright() as playwright:
         page.screenshot(path=str(output / f'mapa-{width}.png'))
         page.get_by_role('tab', name='Perfil', exact=True).click()
         expect(page).to_have_url(re.compile(r'/profile'))
-        expect(page.get_by_role('button', name=re.compile(r'Guardados', re.IGNORECASE))).to_be_visible()
+        expect(page.get_by_role('button', name=re.compile(r'Guardados', re.IGNORECASE))).to_have_count(0)
+        expect(page.get_by_role('button', name=re.compile(r'Premium', re.IGNORECASE))).to_have_count(0)
         expect(page.get_by_role('button', name=re.compile(r'Actividad', re.IGNORECASE))).to_be_visible()
         page.screenshot(path=str(output / f'perfil-{width}.png'))
         report['sizes'].append({'width': width, 'height': height, 'map_height': round(bounds['height']), 'overflow': False})

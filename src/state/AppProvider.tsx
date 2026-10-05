@@ -1,16 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState as NativeAppState } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
-import type { AppNotification, ConnectionState, Place, Profile, PurchaseOption } from '../domain/models';
+import type { AppNotification, ConnectionState, Place, Profile, PublicationAccess } from '../domain/models';
 import type { AppState } from './contracts';
 import { isPreviewPlace, previewPlaces } from '../data/preview';
 import { useMapLocation } from './useMapLocation';
-import { validatePublication } from '../domain/publication';
+import { publicationAccess, resolvePublicationDraft, validatePublication } from '../domain/publication';
 import { friendlyError, requireSessionFor, requireSupabase, supabase } from '../services/supabase';
 import { ensureProfile, fetchPlaces, publishPlace } from '../services/places';
 import { getCurrentPosition } from '../services/sensors';
 import { canRegisterPush, registerPushToken, unregisterPushToken } from '../services/notifications';
-import { clearBillingIdentity, getPurchaseOptions, purchaseOption, restorePurchaseAccess } from '../services/billing';
+import { openRemoteCheckout } from '../services/checkout';
 
 const Context = createContext<AppState | null>(null);
 export function useApp(): AppState {
@@ -29,13 +29,11 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [entitlement, setEntitlement] = useState<{ active: boolean; expires_at: string | null } | null>(null);
+  const [access, setAccess] = useState<PublicationAccess>({ isAdmin: false, remoteCredits: 0 });
   const [connection, setConnection] = useState<ConnectionState>('preview');
   const [error, setError] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationRadius, setNotificationRadius] = useState(10);
-  const [purchaseOptions, setPurchaseOptions] = useState<PurchaseOption[]>([]);
-  const [clock, setClock] = useState(Date.now);
   const sequence = useRef(0);
   const realtimeConnected = useRef(false);
   const dataHealthy = useRef(false);
@@ -46,7 +44,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     if (sessionRef.current?.user.id !== nextSession?.user.id) {
       sequence.current += 1;
       setLoadedUser(null); setProfile(null); setPlaces([]); setSavedIds([]); setNotifications([]);
-      setEntitlement(null); setPurchaseOptions([]); setError(null); setNotificationsEnabled(false);
+      setAccess({ isAdmin: false, remoteCredits: 0 }); setError(null); setNotificationsEnabled(false);
       realtimeConnected.current = false; dataHealthy.current = false;
       setConnection(nextSession ? 'connecting' : 'preview');
     }
@@ -79,7 +77,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
         supabase.from('deriva_saved_places').select('place_id').eq('user_id', user.id),
         supabase.from('deriva_notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
         supabase.from('deriva_notification_preferences').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('deriva_entitlements').select('active,expires_at').eq('user_id', user.id).maybeSingle(),
+        supabase.rpc('deriva_get_access'),
       ]);
       for (const result of [saved, inbox, preference, access]) if (result.error) throw result.error;
       const nextIds = (saved.data ?? []).map(item => String(item.place_id));
@@ -87,10 +85,9 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       const nextPlaces = await fetchPlaces([...nextIds, ...nextNotifications.flatMap(item => item.place_id ? [item.place_id] : [])]);
       if (current !== sequence.current || user.id !== sessionRef.current?.user.id) return;
       setProfile(nextProfile); setPlaces(nextPlaces); setSavedIds(nextIds); setNotifications(nextNotifications);
-      setEntitlement(access.data); setNotificationsEnabled(preference.data?.enabled === true); setNotificationRadius(preference.data?.radius_km ?? 10);
+      setAccess(publicationAccess(access.data)); setNotificationsEnabled(preference.data?.enabled === true); setNotificationRadius(preference.data?.radius_km ?? 10);
       setLoadedUser(user.id); setError(null); dataHealthy.current = true;
       setConnection(realtimeConnected.current ? 'live' : 'connecting');
-      setClock(Date.now());
     } catch (cause) {
       if (current !== sequence.current || user.id !== sessionRef.current?.user.id) return;
       dataHealthy.current = false; setError(friendlyError(cause).message); setConnection('offline');
@@ -106,7 +103,8 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     const channel = supabase.channel(`deriva:${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_places' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_profiles' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_entitlements', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_roles', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_remote_purchases', filter: `user_id=eq.${userId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_saved_places', filter: `user_id=eq.${userId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notifications', filter: `user_id=eq.${userId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notification_preferences', filter: `user_id=eq.${userId}` }, scheduleRefresh)
@@ -118,7 +116,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       });
     const foreground = NativeAppState.addEventListener('change', state => { if (state === 'active') scheduleRefresh(); });
     // Refresh signed photo URLs and reconcile changes after a dropped channel.
-    const reconcile = setInterval(() => { setClock(Date.now()); if (NativeAppState.currentState === 'active') void refresh(); }, 60000);
+    const reconcile = setInterval(() => { if (NativeAppState.currentState === 'active') void refresh(); }, 60000);
     return () => { clearTimeout(refreshTimer); clearInterval(reconcile); foreground.remove(); void supabase?.removeChannel(channel); };
   }, [session?.user.id, refresh]);
 
@@ -154,7 +152,6 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     return user;
   };
   const belongsToSession = !!session && loadedUser === session.user.id;
-  const premium = belongsToSession && entitlement?.active === true && (entitlement.expires_at === null || Date.parse(entitlement.expires_at) > clock);
   const handle = async <T,>(operation: () => Promise<T>): Promise<T> => {
     try { return await operation(); } catch (cause) { throw friendlyError(cause); }
   };
@@ -162,8 +159,8 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     ready, session, profile: belongsToSession ? profile : null, isPreview: !session,
     places: belongsToSession ? [...previewPlaces, ...places] : previewPlaces,
     savedIds: belongsToSession ? savedIds : [], notifications: belongsToSession ? notifications : [],
-    premium, connection: session ? connection : 'preview', error,
-    notificationsEnabled: belongsToSession && notificationsEnabled, notificationRadius, purchaseOptions, refresh,
+    isAdmin: belongsToSession && access.isAdmin, remoteCredits: belongsToSession ? access.remoteCredits : 0, connection: session ? connection : 'preview', error,
+    notificationsEnabled: belongsToSession && notificationsEnabled, notificationRadius, refresh,
     mapLocation: navigationLocation.location, startMapLocation: navigationLocation.start, locateMap: navigationLocation.locate,
     signIn: (email, password) => handle(async () => {
       const result = await requireSupabase().auth.signInWithPassword({ email: email.trim(), password });
@@ -181,7 +178,6 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       signingOutUser.current = user.id;
       try {
         await unregisterPushToken(user.id).catch(() => {});
-        await clearBillingIdentity(user.id).catch(() => {});
         if (sessionRef.current?.user.id !== user.id) throw new Error('Tu sesión cambió mientras cerrabas la cuenta.');
         const result = await requireSupabase().auth.signOut({ scope: 'local' });
         if (result.error) throw result.error;
@@ -196,14 +192,20 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       await refresh();
     }),
     publish: draft => handle(async () => {
-      const user = currentUser(); const client = requireSupabase();
+      const user = currentUser();
+      const bound = await requireSessionFor(user.id, () => isSameSession(user.id));
+      const client = bound.client;
       const existing = await client.from('deriva_places').select('id').eq('id', draft.requestId).eq('owner_id', user.id).maybeSingle();
       if (existing.error) throw existing.error;
+      await bound.assertCurrent();
       if (existing.data) { await refresh(); return existing.data.id as string; }
-      const gps = premium ? null : await getCurrentPosition();
+      const gps = draft.mode === 'local' ? await getCurrentPosition() : null;
+      const latestAccess = await client.rpc('deriva_get_access');
+      if (latestAccess.error) throw latestAccess.error;
       if (sessionRef.current?.user.id !== user.id) throw new Error('Tu sesión cambió. Inicia la publicación de nuevo.');
-      const validated = validatePublication(draft, premium, gps);
-      const id = await publishPlace(user.id, validated, gps);
+      const currentDraft = resolvePublicationDraft(draft, gps);
+      const validated = validatePublication(currentDraft, publicationAccess(latestAccess.data), gps);
+      const id = await publishPlace(user.id, validated, gps, () => isSameSession(user.id));
       await refresh();
       return id;
     }),
@@ -251,9 +253,11 @@ export function AppProvider({ children }: React.PropsWithChildren) {
         await refresh();
       } finally { if (updatingPushUser.current === user.id) updatingPushUser.current = null; }
     }),
-    loadPurchaseOptions: () => handle(async () => { const user = currentUser(); const options = await getPurchaseOptions(user.id); if (sessionRef.current?.user.id === user.id) setPurchaseOptions(options); }),
-    purchase: identifier => handle(async () => { const user = currentUser(); const result = await purchaseOption(user.id, identifier); if (!isSameSession(user.id)) throw new Error('Tu sesión cambió. Verifica la compra desde la cuenta con la que empezaste.'); await refresh(); return result; }),
-    restorePurchases: () => handle(async () => { const user = currentUser(); const result = await restorePurchaseAccess(user.id); if (!isSameSession(user.id)) throw new Error('Tu sesión cambió. Restaura desde la cuenta con la que empezaste.'); await refresh(); return result; }),
+    openRemoteCheckout: requestId => handle(async () => {
+      const user = currentUser();
+      try { await openRemoteCheckout(user.id, requestId, () => isSameSession(user.id)); }
+      finally { if (isSameSession(user.id)) await refresh(); }
+    }),
     updateDisplayName: name => handle(async () => {
       const user = currentUser();
       if (name.trim().length < 2 || name.trim().length > 60) throw new Error('Tu nombre debe tener entre 2 y 60 caracteres.');

@@ -12,6 +12,8 @@ export function Field({ label, hint, error, icon, ...props }: TextInputProps & {
         <TextInput
           accessibilityLabel={label}
           placeholderTextColor={colors.muted}
+          keyboardAppearance="dark"
+          selectionColor={colors.green}
           style={[styles.input, props.multiline && styles.multiline]}
           {...props}
         />
@@ -24,8 +26,8 @@ export function Field({ label, hint, error, icon, ...props }: TextInputProps & {
 export function Chip({ label, active, onPress, icon }: { label: string; active?: boolean; onPress: () => void; icon?: IconName }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!active }} onPress={onPress} style={({ pressed }) => [styles.chip, active && styles.active, pressed && { opacity: 0.7 }]}>
-      {icon && <Ionicons name={icon} size={16} color={active ? colors.lime : colors.ink} />}
-      <Text style={[styles.chipLabel, active && { fontWeight: '600', color: colors.white }]}>{label}</Text>
+      {icon && <Ionicons name={icon} size={16} color={active ? colors.onAccent : colors.ink} />}
+      <Text style={[styles.chipLabel, active && { fontWeight: '600', color: colors.onAccent }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -37,6 +39,6 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 88, textAlignVertical: 'top' },
   invalid: { borderColor: colors.error },
   chip: { minHeight: 44, paddingHorizontal: 15, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  active: { backgroundColor: colors.ink, borderColor: colors.ink },
+  active: { backgroundColor: colors.lime, borderColor: colors.lime },
   chipLabel: { fontSize: 12, color: colors.ink, lineHeight: 18 },
 });

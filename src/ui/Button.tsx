@@ -18,7 +18,7 @@ type Props = {
 
 export function Button({ label, onPress, icon, variant = 'primary', loading, disabled, style, accessibilityLabel, testID }: Props) {
   const unavailable = disabled || loading;
-  const foreground = variant === 'danger' ? colors.error : colors.ink;
+  const foreground = variant === 'danger' ? colors.error : variant === 'primary' ? colors.onAccent : colors.ink;
   return (
     <Pressable
       accessibilityRole="button"
@@ -38,13 +38,13 @@ export function Button({ label, onPress, icon, variant = 'primary', loading, dis
 export function IconButton({ icon, label, onPress, active = false }: { icon: IconName; label: string; onPress: () => void; active?: boolean }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.iconButton, active && styles.active, pressed && styles.pressed]}>
-      <Ionicons name={icon} size={21} color={colors.ink} />
+      <Ionicons name={icon} size={21} color={active ? colors.onAccent : colors.ink} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  button: { minHeight: 48, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  button: { minHeight: 50, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   primary: { backgroundColor: colors.lime, borderWidth: 1, borderColor: colors.lime },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   ghost: { backgroundColor: 'transparent' },

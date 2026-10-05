@@ -65,7 +65,7 @@ test('approximate navigation location does not relax the free publication GPS ru
   const store = createMapLocationStore(async () => ({ position: actualPosition }));
   await store.start();
   assert.equal(store.getSnapshot().status, 'ready');
-  assert.throws(() => validatePublication({ requestId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', title: 'Un parque', category: 'naturaleza', latitude: actualPosition.latitude, longitude: actualPosition.longitude, photo: { uri: 'file:///photo.jpg', source: 'camera', capturedAt: actualPosition.timestamp, biometricVerified: true } }, false, { ...actualPosition, mocked: false }, Date.parse(actualPosition.timestamp)), /precisión/i);
+  assert.throws(() => validatePublication({ requestId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', title: 'Un parque', mode: 'local', latitude: actualPosition.latitude, longitude: actualPosition.longitude, photo: { uri: 'file:///photo.jpg', source: 'camera', capturedAt: actualPosition.timestamp, biometricVerified: true } }, { isAdmin: false, remoteCredits: 0 }, { ...actualPosition, mocked: false }, Date.parse(actualPosition.timestamp)), /precisión/i);
 });
 
 test('GPS center wins over distant demo markers and stays stable during selection/feed changes', () => {

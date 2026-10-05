@@ -33,8 +33,9 @@ export type AppNotification = {
 export type PublishDraft = Coordinate & {
   requestId: string;
   title: string;
-  category: Category;
+  mode: 'local' | 'remote';
   photo: Photo;
 };
-export type PurchaseOption = { identifier: string; title: string; price: string; period: string };
+export type PublicationAccess = { isAdmin: boolean; remoteCredits: number };
+export type PublicationInput = Omit<PublishDraft, keyof Coordinate> & Partial<Coordinate>;
 export type ConnectionState = 'preview' | 'connecting' | 'live' | 'offline';
