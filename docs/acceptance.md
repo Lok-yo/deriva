@@ -68,9 +68,14 @@ La verificación completa requiere abrir el Payment Link desde Expo Go; el ticke
 
 - [ ] Publicar con una cuenta y observar el lugar desde otra sin recargar.
 - [ ] Confirmar un pago o cambiar el rol desde el servidor y observar la actualización; regresar al primer plano reconcilia los datos.
-- [ ] En Expo Go, comprobar Actividad con una cuenta cuya zona ya exista. Activar push informa de la limitación sin registrar tokens ni simular avisos.
+- [ ] Al abrir en un teléfono, observar el permiso de notificaciones cuando el sistema pueda solicitarlo; un permiso concedido o denegado definitivamente no genera otro diálogo.
+- [ ] En Expo Go, guardar una zona normal y comprobar Actividad sin registrar tokens ni simular push.
+- [ ] Con administrador, publicar un lugar propio y otro lejano: ambos deben aparecer una sola vez en Actividad, incluso sin preferencias.
+- [ ] Con cuenta normal, comprobar avisos de otra cuenta dentro del radio guardado y ausencia de avisos propios o lejanos. El radio nuevo predeterminado es 10 km; los ya guardados se conservan.
 
 Push remoto requiere una compilación propia, EAS y credenciales FCM/APNs. En esa fase, comprobar entrega visible en segundo plano, apertura del destino al tocarla, zona/radio y cierre de sesión. Un receipt de Expo confirma aceptación por APNs/FCM, no que una persona vio el aviso. [Notificaciones SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
+
+La actualización de alertas pasó TypeScript, ESLint y 96 pruebas. La suite alojada `supabase/tests/deriva_admin_notifications.sql` verificó avisos globales del administrador, distancia y exclusión del autor normal, ausencia de duplicados y RLS; sus 14 entradas de cola de prueba se revirtieron con `ROLLBACK`. Se conservaron los cuatro lugares existentes y quedaron cero avisos, tokens o entradas de cola de fixtures. La exportación Android/iOS/web pasó en `verification/admin-notifications-export`. El diálogo de permisos y la entrega en un teléfono todavía requieren verificación física.
 
 ## Regreso de Stripe: aviso de montaje en Android
 

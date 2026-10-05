@@ -1,5 +1,19 @@
 import type { ExpectedSession } from './identity';
 
+interface NotificationPermission { granted: boolean; canAskAgain: boolean; }
+
+// Permission is independent of remote-token support (notably Android Expo Go).
+export async function ensureNotificationPermission(api: {
+  createChannel(): Promise<void>;
+  getPermission(): Promise<NotificationPermission>;
+  requestPermission(): Promise<NotificationPermission>;
+}, requestPermission: boolean): Promise<boolean> {
+  await api.createChannel();
+  let permission = await api.getPermission();
+  if (!permission.granted && permission.canAskAgain && requestPermission) permission = await api.requestPermission();
+  return permission.granted;
+}
+
 export async function commitPushRegistration(session: ExpectedSession, operations: {
   register(): Promise<void>;
   persist(): Promise<void>;

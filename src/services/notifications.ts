@@ -5,12 +5,40 @@ import * as Device from 'expo-device';
 import * as Crypto from 'expo-crypto';
 import { requireSessionFor } from './supabase';
 import { createOperationQueue } from './identity';
-import { commitPushRegistration, createNotificationTapConsumer } from './notificationsCore';
+import { commitPushRegistration, createNotificationTapConsumer, ensureNotificationPermission } from './notificationsCore';
 
 const deviceKey = 'deriva.installation';
 const tokenKey = (userId: string) => `deriva.pushToken.${userId}`;
 const pushOperations = createOperationQueue();
 const projectId = () => Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+let startupPermission: Promise<boolean> | null = null;
+
+async function notificationPermission(requestPermission: boolean): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+  // SDK 57's index imports remote push listeners and warns in Expo Go. Load only
+  // its permission/channel exports: these local APIs are available in Expo Go.
+  const Permissions = await import('expo-notifications/build/NotificationPermissions');
+  const { IosAuthorizationStatus } = await import('expo-notifications/build/NotificationPermissions.types');
+  const toPermission = (permission: Awaited<ReturnType<typeof Permissions.getPermissionsAsync>>) => ({
+    granted: permission.granted || permission.ios?.status === IosAuthorizationStatus.PROVISIONAL,
+    canAskAgain: permission.canAskAgain,
+  });
+  return ensureNotificationPermission({
+    async createChannel() {
+      if (Platform.OS !== 'android') return;
+      const { setNotificationChannelAsync } = await import('expo-notifications/build/setNotificationChannelAsync');
+      const { AndroidImportance } = await import('expo-notifications/build/NotificationChannelManager.types');
+      await setNotificationChannelAsync('nearby', { name: 'Lugares de Deriva', importance: AndroidImportance.HIGH, lightColor: '#C5ED95' });
+    },
+    async getPermission() { return toPermission(await Permissions.getPermissionsAsync()); },
+    async requestPermission() { return toPermission(await Permissions.requestPermissionsAsync()); },
+  }, requestPermission);
+}
+
+export function requestNotificationPermissionOnStartup(): Promise<boolean> {
+  // A single prompt per app session, including Strict Mode effect remounts.
+  return startupPermission ??= pushOperations(() => notificationPermission(true));
+}
 
 export function canRegisterPush(): boolean {
   return Platform.OS !== 'web' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient && Device.isDevice && !!projectId();
@@ -22,7 +50,10 @@ export function registerPushToken(expectedUserId: string, options: { requestPerm
     if (!canRegisterPush()) {
       if (!requestPermission) return false;
       if (Platform.OS === 'web') throw new Error('Activa las notificaciones desde Deriva en tu teléfono.');
-      if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) throw new Error('Expo Go no permite recibir el push de Deriva. Puedes consultar los avisos en Actividad mientras usas la app.');
+      if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+        await notificationPermission(true);
+        return false; // Inbox preferences work, but Expo Go cannot receive remote push.
+      }
       if (!Device.isDevice) throw new Error('Activa las notificaciones en un teléfono físico para probar la entrega.');
       throw new Error('Las notificaciones todavía no están disponibles en esta versión.');
     }
@@ -30,17 +61,9 @@ export function registerPushToken(expectedUserId: string, options: { requestPerm
     const Notifications = await import('expo-notifications');
     await session.assertCurrent();
     Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }) });
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('nearby', { name: 'Lugares cerca de ti', importance: Notifications.AndroidImportance.HIGH, lightColor: '#DFFB72' });
-      await session.assertCurrent();
-    }
-    let permission = await Notifications.getPermissionsAsync();
+    const permitted = await notificationPermission(requestPermission);
     await session.assertCurrent();
-    if (permission.status !== 'granted' && requestPermission) {
-      permission = await Notifications.requestPermissionsAsync();
-      await session.assertCurrent();
-    }
-    if (permission.status !== 'granted') {
+    if (!permitted) {
       if (!requestPermission) return false;
       throw new Error('Permite las notificaciones en Ajustes para recibir nuevos lugares.');
     }

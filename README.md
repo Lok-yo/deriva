@@ -68,7 +68,9 @@ RLS protege roles, compras, guardados, inbox, preferencias y tokens. El límite 
 
 Los módulos antiguos de RevenueCat se conservan en el historial/backend por compatibilidad, pero sus entitlements **ya no autorizan ubicaciones remotas**. La app usa el pago por punto. No configures RevenueCat para este flujo.
 
-Push remoto sigue pendiente de una compilación propia, proyecto EAS y credenciales FCM/APNs. Deriva no registra tokens push dentro de Expo Go. Actividad muestra avisos de cuentas cuya zona ya esté configurada. Esto no afecta al pago de prueba, que usa el navegador. [Notificaciones SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
+Push remoto sigue pendiente de una compilación propia, proyecto EAS y credenciales FCM/APNs. Deriva no registra tokens push dentro de Expo Go. Al abrir la app se solicita el permiso de notificaciones, incluso antes de iniciar sesión. En Android, el canal se crea antes del diálogo; si el sistema ya concedió el permiso o no permite volver a preguntarlo, no aparece otro diálogo. Actividad funciona en Expo Go aunque no se pueda obtener un token remoto.
+
+Los administradores reciben cada lugar nuevo en Actividad y en la cola push, sin límite de distancia, incluidos sus propios lugares y sin configurar una zona. Las cuentas normales deben activar su zona en Perfil: **10 km por defecto**, ajustable a 1, 5, 10, 25 o 50 km. El centro es el GPS guardado al activar o guardar la zona; no sigue el teléfono en segundo plano. Sus propios lugares no generan avisos. Los radios ya guardados se conservan. Esto no afecta al pago de prueba, que usa el navegador. [Notificaciones SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/notifications/).
 
 El worker `deriva-push-worker` procesa la cola y consulta receipts. Su cron usa tokens de un solo uso; no modifiques trabajos ni funciones de asistencia. Configuración de push y SQL en la [guía del backend](supabase/README.md).
 

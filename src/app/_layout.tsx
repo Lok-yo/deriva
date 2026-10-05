@@ -3,7 +3,7 @@ import { Stack, router, type ErrorBoundaryProps } from 'expo-router';
 import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from '../state/AppProvider';
-import { listenForNotificationTaps } from '../services/notifications';
+import { listenForNotificationTaps, requestNotificationPermissionOnStartup } from '../services/notifications';
 import { AppShell } from '../ui/AppShell';
 import { Button } from '../ui/Button';
 import { colors, type } from '../ui/theme';
@@ -14,6 +14,7 @@ function Routes() {
   const { ready } = useApp();
   useEffect(() => {
     if (!ready) return;
+    void requestNotificationPermissionOnStartup().catch(() => {});
     return listenForNotificationTaps(id => router.push({ pathname: '/place/[id]', params: { id } }));
   }, [ready]);
   return <AppShell><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>

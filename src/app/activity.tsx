@@ -37,7 +37,7 @@ export default function Activity() {
         <View style={styles.icon}><Ionicons name="location-outline" size={23} color={colors.green} /></View>
         <View style={{ flex: 1, gap: 7 }}><View style={[layout.row, { justifyContent: 'space-between', flexWrap: 'wrap' }]}><Text accessibilityRole="header" style={[type.label, { flexShrink: 1 }]}>{notification.title}</Text>{!notification.read_at && <Badge text="NUEVA" />}</View><Text style={type.small}>{notification.body}</Text><Text style={[type.small, { fontSize: 11 }]}>{new Date(notification.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text></View>
         {notification.place_id && <Ionicons name="chevron-forward" size={18} color={colors.muted} />}
-      </Pressable>)}</View> : <EmptyState title="Por ahora, el camino está tranquilo." body="Cuando alguien comparta un lugar cerca de tu zona de alertas, aparecerá aquí." icon="notifications-outline" />}
+      </Pressable>)}</View> : <EmptyState title="Por ahora, el camino está tranquilo." body={app.isAdmin ? "Cada lugar nuevo aparecerá aquí, incluidos los tuyos y los que estén lejos." : "Cuando alguien comparta un lugar cerca de tu zona de alertas, aparecerá aquí."} icon="notifications-outline" />}
     </>}
   </Page>;
 }

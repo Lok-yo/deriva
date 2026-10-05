@@ -122,7 +122,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
 
   useEffect(() => {
     const userId = session?.user.id;
-    if (!userId || loadedUser !== userId || !notificationsEnabled || !canRegisterPush()) return;
+    if (!userId || loadedUser !== userId || (!notificationsEnabled && !access.isAdmin) || !canRegisterPush()) return;
     let disposed = false;
     let busy = false;
     let lastSuccess = 0;
@@ -142,7 +142,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     const foreground = NativeAppState.addEventListener('change', state => { if (state === 'active') void reconcile(); });
     const retry = setInterval(() => { if (NativeAppState.currentState === 'active') void reconcile(); }, 60000);
     return () => { disposed = true; foreground.remove(); clearInterval(retry); };
-  }, [session?.user.id, loadedUser, notificationsEnabled]);
+  }, [session?.user.id, loadedUser, notificationsEnabled, access.isAdmin]);
 
   const isSameSession = (userId: string) => sessionRef.current?.user.id === userId && signingOutUser.current !== userId;
   const currentUser = () => {
@@ -160,7 +160,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     places: belongsToSession ? [...previewPlaces, ...places] : previewPlaces,
     savedIds: belongsToSession ? savedIds : [], notifications: belongsToSession ? notifications : [],
     isAdmin: belongsToSession && access.isAdmin, remoteCredits: belongsToSession ? access.remoteCredits : 0, connection: session ? connection : 'preview', error,
-    notificationsEnabled: belongsToSession && notificationsEnabled, notificationRadius, refresh,
+    notificationsEnabled: belongsToSession && (notificationsEnabled || access.isAdmin), notificationRadius, refresh,
     mapLocation: navigationLocation.location, startMapLocation: navigationLocation.start, locateMap: navigationLocation.locate,
     signIn: (email, password) => handle(async () => {
       const result = await requireSupabase().auth.signInWithPassword({ email: email.trim(), password });
