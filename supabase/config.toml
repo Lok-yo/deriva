@@ -46,3 +46,11 @@ verify_jwt = false
 
 [functions.deriva-push-worker]
 verify_jwt = false
+
+# POST verifies the user's JWT with Auth.getUser; GET is an informational return page.
+[functions.deriva-remote-checkout]
+verify_jwt = false
+
+# Stripe authenticates requests with its raw-body HMAC signature, not a Supabase JWT.
+[functions.deriva-stripe-webhook]
+verify_jwt = false

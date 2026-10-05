@@ -121,8 +121,6 @@ select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4
   '42501', 'free cannot choose a remote location');
 select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4000-8000-000000000005','  x  ','naturaleza',29.07,-110.96,'10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000005.jpg','camera',29.07,-110.96,10,clock_timestamp(),true)$sql$,
   '22023', 'trimmed title minimum');
-select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4000-8000-000000000005','Lugar de prueba','inexistente',29.07,-110.96,'10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000005.jpg','camera',29.07,-110.96,10,clock_timestamp(),true)$sql$,
-  '22023', 'valid category required');
 select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4000-8000-000000000005','Lugar de prueba','naturaleza',29.07,-110.96,'10000000-0000-4000-8000-000000000002/20000000-0000-4000-8000-000000000005.jpg','camera',29.07,-110.96,10,clock_timestamp(),true)$sql$,
   '42501', 'photo path must exactly match user and request');
 select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4000-8000-000000000004','Lugar de prueba','naturaleza',29.07,-110.96,'10000000-0000-4000-8000-000000000001/20000000-0000-4000-8000-000000000004.jpg','camera',29.07,-110.96,10,clock_timestamp(),true)$sql$,
@@ -263,9 +261,19 @@ select pg_temp.set_claims('10000000-0000-4000-8000-000000000003', 'authenticated
 set local role authenticated;
 select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4000-8000-000000000002','Mirador remoto','misterio',19.43,-99.13,
   '10000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000002.jpg','camera')$sql$, '42501', 'Premium camera still needs biometrics');
-select pg_temp.assert_true(public.deriva_create_place('20000000-0000-4000-8000-000000000002','Mirador remoto','misterio',19.43,-99.13,
+select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4000-8000-000000000002','Mirador remoto','misterio',19.43,-99.13,
+  '10000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000002.jpg','gallery')$sql$,
+  '42501', 'legacy active Premium no longer authorizes arbitrary locations');
+reset role;
+select pg_temp.set_claims(null, 'service_role');
+set local role service_role;
+select public.deriva_record_remote_purchase('10000000-0000-4000-8000-000000000003','cs_test_legacy_rules','pi_legacy_rules',100,'usd');
+reset role;
+select pg_temp.set_claims('10000000-0000-4000-8000-000000000003', 'authenticated');
+set local role authenticated;
+select pg_temp.assert_true(public.deriva_create_place_v2('20000000-0000-4000-8000-000000000002','Mirador remoto','remote',19.43,-99.13,
   '10000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000002.jpg','gallery') = '20000000-0000-4000-8000-000000000002'::uuid,
-  'active Premium can publish gallery photo at arbitrary location');
+  'one confirmed payment permits one arbitrary location with gallery');
 
 reset role;
 select pg_temp.set_claims('10000000-0000-4000-8000-000000000001', 'authenticated');

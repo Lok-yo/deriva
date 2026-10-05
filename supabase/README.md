@@ -1,6 +1,6 @@
 # Backend de Deriva
 
-Este directorio entrega SQL, pruebas y tres Edge Functions independientes de la app Expo. La migración crea tablas `deriva_*`, esquema privado, RPC, RLS, bucket privado `deriva-photos` y publicaciones Realtime. Conserva las tablas, políticas, triggers y trabajos de asistencia existentes.
+Este directorio entrega SQL, pruebas y Edge Functions independientes de la app Expo. La migración crea tablas `deriva_*`, esquema privado, RPC, RLS, bucket privado `deriva-photos` y publicaciones Realtime. Conserva las tablas, políticas, triggers y trabajos de asistencia existentes.
 
 ## Aplicar en un proyecto nuevo
 
@@ -13,36 +13,47 @@ npx --yes supabase@2.119.0 db push --dry-run
 npx --yes supabase@2.119.0 db push
 ```
 
-La migración es `migrations/20261003051749_deriva_initial.sql`. En el proyecto conectado `kqabddlasmvipuskvnvr` ya está aplicada. Su historial incluye migraciones de asistencia ausentes de este directorio: conserva el historial completo antes de futuras migraciones compartidas; no repares ni elimines sus versiones para hacer coincidir este checkout.
+Las migraciones `20261003051749_deriva_initial.sql` y `20261005021423_deriva_remote_publications.sql` están aplicadas en el proyecto conectado `kqabddlasmvipuskvnvr`. La segunda introduce roles propios de Deriva y pagos consumibles, con suscripciones Realtime. El wrapper de publicación anterior es exclusivamente local y no acepta Premium como autorización. Su historial incluye migraciones de asistencia ausentes de este directorio: conserva el historial completo antes de futuras migraciones compartidas; no repares ni elimines sus versiones para hacer coincidir este checkout.
 
 `config.toml` configura PostgreSQL 17 y Auth local. La confirmación de correo desactivada allí solo afecta desarrollo local. En un proyecto nuevo, revisa los ajustes alojados de Auth y configura una URL web válida para confirmar el correo; después puedes iniciar sesión manualmente en la app. En el proyecto compartido, Deriva envía `full_name` de 2 a 60 caracteres para cumplir el requisito del trigger de asistencia existente.
 
-## Secretos y funciones
+## Stripe de prueba y funciones
 
-Configura secretos en el dashboard de Edge Functions o en un archivo local `supabase/.env.functions`, excluido de Git:
+El modelo actual cobra **1 USD por ubicación remota**, sin suscripciones. Checkout y el webhook están desplegados. Falta configurar las claves del entorno de prueba para completar una compra; el endpoint del webhook responde `503 / stripe_webhook_not_configured` mientras falta su secreto. La publicación local y el administrador no dependen de Stripe.
 
-| Variable | Uso |
+| Secreto del servidor | Uso |
 | --- | --- |
-| `REVENUECAT_SECRET_API_KEY` | Clave privada v1 con lectura de clientes para verificar `deriva_premium` |
-| `REVENUECAT_WEBHOOK_AUTH` | Secreto aleatorio; RevenueCat lo envía como `Authorization: Bearer …` |
-| `EXPO_ACCESS_TOKEN` | Opcional; requerido si activas seguridad adicional de Expo Push Service |
+| `DERIVA_STRIPE_TEST_SECRET_KEY` | Clave Stripe `sk_test_…`; las claves reales se rechazan |
+| `DERIVA_STRIPE_WEBHOOK_SECRET` | Firma `whsec_…` del endpoint de prueba |
+| `EXPO_ACCESS_TOKEN` | Opcional, si habilitas seguridad adicional en Expo Push Service |
 
-El runtime alojado proporciona `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; estos valores permanecen en el servidor. El cliente Expo utiliza una clave publishable. [Variables del runtime](https://supabase.com/docs/guides/functions/secrets).
+Configúralos en el dashboard o en `supabase/.env.functions`, excluido de Git. El runtime proporciona `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; nunca se incluyen en Expo. [Secretos de funciones](https://supabase.com/docs/guides/functions/secrets).
 
 ```bash
 npx --yes supabase@2.119.0 secrets set --env-file supabase/.env.functions --project-ref TU_PROJECT_REF
-npx --yes supabase@2.119.0 functions deploy deriva-billing-sync deriva-revenuecat deriva-push-worker --use-api --no-verify-jwt --project-ref TU_PROJECT_REF
+npx --yes supabase@2.119.0 functions deploy deriva-remote-checkout deriva-stripe-webhook deriva-push-worker --use-api --no-verify-jwt --project-ref TU_PROJECT_REF
 ```
 
-Despliega únicamente esas tres funciones; conserva las funciones del resto del proyecto. En `config.toml` tienen `verify_jwt = false` porque cada handler autentica antes de operar:
+Solo despliega las funciones de Deriva. Las funciones usan `verify_jwt=false` porque autentican explícitamente antes de operar:
 
 | Función | Autenticación |
 | --- | --- |
-| `deriva-billing-sync` | JWT de usuario validado con `auth.getUser`; no admite usuarios anónimos |
-| `deriva-revenuecat` | Secreto de webhook; reconsulta RevenueCat para todos los UUID afectados |
-| `deriva-push-worker` | Cabecera `x-deriva-job-token`, validada y consumida mediante RPC de servicio |
+| `deriva-remote-checkout` POST | JWT validado por `auth.getUser`; importe fijo, modo de prueba, evita cobrar a admin o con crédito pendiente |
+| `deriva-remote-checkout` GET | Retorno público informativo; no concede permisos |
+| `deriva-stripe-webhook` | HMAC-SHA256 de Stripe sobre cuerpo original, ventana de cinco minutos y comprobación de evento pagado de prueba |
+| `deriva-push-worker` | Token de trabajo de un solo uso validado por RPC |
 
-La comprobación propia es necesaria con claves publishable y llamadas de servidores externos. [Autenticación de Edge Functions](https://supabase.com/docs/guides/functions/auth). Configura RevenueCat hacia `https://TU_PROJECT_REF.supabase.co/functions/v1/deriva-revenuecat`; los UUID de Supabase son sus App User IDs.
+[Guía de configuración y prueba de Stripe](../docs/stripe-pruebas.md). La app vuelve a consultar acceso al regresar al primer plano; no confía en parámetros del navegador para confirmar el pago.
+
+`deriva_roles` y `deriva_remote_purchases` tienen RLS y lectura exclusiva del propietario. Los clientes no pueden escribir ni concederse privilegios. `deriva_get_access()` devuelve `is_admin` y `remote_credits`. `deriva_create_place_v2` crea el lugar y consume un solo crédito en la misma transacción. Reintentos, reembolsos y cambios de rol se serializan; los identificadores sobreviven a la eliminación del lugar.
+
+Para asignar un administrador de Deriva, desde una conexión de servicio/administrador:
+
+```sql
+select public.deriva_set_admin('UUID_DE_LA_CUENTA', true);
+```
+
+El rol de `lleonalmaza@gmail.com` ya se asignó y verificó. No es un administrador de Supabase ni del checador. Las funciones antiguas `deriva-billing-sync` y `deriva-revenuecat` se conservan por compatibilidad, pero sus entitlements ya no autorizan publicaciones remotas y no forman parte del cliente actual.
 
 ## Activar y controlar el worker
 
@@ -71,10 +82,13 @@ Ejecuta el archivo completo con una conexión de administrador configurada en `D
 
 ```bash
 psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_rules.sql
+psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_remote_publications.sql
 ```
 
 La suite inicia una transacción y termina en `ROLLBACK`; revierte fixtures, tokens, derechos, ajustes de Storage y cambios del worker/cron. No la ejecutes fragmentada. Comprueba reglas de publicación, aislamiento de cuentas, Storage, privilegios, reintentos y autenticación de cron, incluyendo replay y expiración.
 
-Al 3 de octubre de 2026 pasaron la suite en PostgreSQL 17 alojado, 16 comprobaciones de API real de Auth/Storage/RLS/Realtime, tres checks de Deno y ocho comprobaciones de handlers con dependencias sustituidas. Las tres funciones están activas en versión 1; el cron autenticado respondió HTTP 200 con cola vacía. Pagos reales, sensores y push visible quedan pendientes en [aceptación](../docs/acceptance.md).
+Las dos suites pasaron en PostgreSQL alojado después de aplicar el nuevo modelo. Sus fixtures se revirtieron: quedaron un usuario real, cero lugares y cero compras, más el rol solicitado. Se comprobaron publicación local, admin, compra consumible, intentos de elevar privilegios, RLS, rollback, reintentos y reembolsos fuera de orden. La concurrencia está protegida con bloqueos transaccionales; estas suites no crean carreras físicas entre conexiones.
 
-Los cuatro INFO del advisor por RLS sin políticas son intencionales para tablas privadas y cola. El WARN de protección de contraseñas filtradas desactivada pertenece al Auth compartido preexistente. El aislamiento de tablas no separa los usuarios del checador; utiliza otro proyecto si necesitas Auth independiente.
+Los dos endpoints Stripe pasaron Deno check y las pruebas unitarias de firma/pago. Los endpoints desplegados rechazan Checkout sin sesión, muestran un retorno informativo y fallan de forma explícita mientras falta el secreto de webhook. Una transacción completa de Stripe y los sensores siguen pendientes de las claves y del teléfono.
+
+El advisor reportó seis INFO por RLS sin políticas en tablas privadas/cola, deliberadamente inaccesibles a clientes, y el WARN preexistente de protección de contraseñas filtradas desactivada en Auth compartido. [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). No se cambiaron políticas de asistencia ni configuración compartida de Auth.
