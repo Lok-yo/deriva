@@ -47,3 +47,6 @@ supabase/.temp/
 # generated native folders
 /ios
 /android
+
+# local code index
+.codegraph/

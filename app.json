@@ -26,6 +26,13 @@
       "expo-font",
       "expo-router",
       "expo-splash-screen"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7f833af2-071d-454a-8219-42f7486a854d"
+      },
+      "router": {}
+    },
+    "owner": "lkiyo"
   }
 }

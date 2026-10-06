@@ -21,5 +21,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-sensors', { motionPermission: 'Deriva usa el magnetómetro para orientar la brújula hacia el lugar que elegiste.' }],
     ['expo-notifications', { color: '#C5ED95', defaultChannel: 'nearby' }],
   ],
-  extra: { ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? { eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID } } : {}) },
+  extra: {
+    ...config.extra,
+    eas: {
+      ...config.extra?.eas,
+      ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID } : {}),
+    },
+  },
 });
