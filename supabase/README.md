@@ -1,6 +1,6 @@
 # Backend de Deriva
 
-Este directorio entrega SQL, pruebas y Edge Functions independientes de la app Expo. La migración crea tablas `deriva_*`, esquema privado, RPC, RLS, bucket privado `deriva-photos` y publicaciones Realtime. Conserva las tablas, políticas, triggers y trabajos de asistencia existentes.
+Este directorio entrega SQL, pruebas y Edge Functions independientes de la app Expo. La migración crea tablas `deriva_*`, esquema privado, RPC, RLS, bucket privado `deriva-photos` y publicaciones Realtime. No reemplaza tablas, políticas, triggers ni trabajos que ya existan en el proyecto.
 
 ## Aplicar en un proyecto nuevo
 
@@ -13,13 +13,13 @@ npx --yes supabase@2.119.0 db push --dry-run
 npx --yes supabase@2.119.0 db push
 ```
 
-Las migraciones `20261003051749_deriva_initial.sql` y `20261005021423_deriva_remote_publications.sql` están aplicadas en el proyecto conectado `kqabddlasmvipuskvnvr`. La segunda introduce roles propios de Deriva y pagos consumibles, con suscripciones Realtime. El wrapper de publicación anterior es exclusivamente local y no acepta Premium como autorización. Su historial incluye migraciones de asistencia ausentes de este directorio: conserva el historial completo antes de futuras migraciones compartidas; no repares ni elimines sus versiones para hacer coincidir este checkout.
+Las migraciones `20261003051749_deriva_initial.sql` y `20261005021423_deriva_remote_publications.sql` introducen roles propios de Deriva y pagos consumibles, con suscripciones Realtime. El wrapper de publicación anterior es exclusivamente local y no acepta Premium como autorización. Si el proyecto ya tiene otro historial de migraciones, consérvalo: no borres ni reescribas versiones ajenas a este directorio para hacerlas coincidir con este checkout.
 
-`config.toml` configura PostgreSQL 17 y Auth local. La confirmación de correo desactivada allí solo afecta desarrollo local. En un proyecto nuevo, revisa los ajustes alojados de Auth y configura una URL web válida para confirmar el correo; después puedes iniciar sesión manualmente en la app. En el proyecto compartido, Deriva envía `full_name` de 2 a 60 caracteres para cumplir el requisito del trigger de asistencia existente.
+`config.toml` configura PostgreSQL 17 y Auth local. La confirmación de correo desactivada allí solo afecta desarrollo local. En un proyecto nuevo, revisa los ajustes alojados de Auth y configura una URL web válida para confirmar el correo; después puedes iniciar sesión manualmente en la app. El registro envía `full_name` de 2 a 60 caracteres para cumplir el trigger de altas que ya exige ese dato.
 
 ## Stripe de prueba y funciones
 
-El modelo actual cobra **1 USD por ubicación remota**, sin suscripciones. Stripe de prueba está provisionado en **New business** mediante un precio fijo y Payment Link. No necesita una clave API secreta para abrir los pagos: el backend autentica al usuario, crea un ticket opaco y agrega su referencia al enlace de prueba.
+El modelo actual cobra **1 USD por ubicación remota**, sin suscripciones. Stripe de prueba usa un precio fijo y un Payment Link. No necesita una clave API secreta para abrir los pagos: el backend autentica al usuario, crea un ticket opaco y agrega su referencia al enlace de prueba.
 
 La migración `20261005030841_deriva_payment_link_tickets.sql` agrega configuración y tickets en `deriva_private`. Las RPC `deriva_configure_payment_link`, `deriva_payment_link_config`, `deriva_checkout_ticket` y `deriva_record_payment_link_purchase` son exclusivas del servicio. El secreto `whsec_…` se guarda cifrado en Vault, nunca en archivos ni en Expo. Los tickets duran 24 horas; se verifica cuándo Stripe creó el Checkout, permitiendo webhooks entregados tarde. Cada sesión pagada distinta concede un crédito y sus reintentos no lo duplican.
 
@@ -48,7 +48,7 @@ Para asignar un administrador de Deriva, desde una conexión de servicio/adminis
 select public.deriva_set_admin('UUID_DE_LA_CUENTA', true);
 ```
 
-El rol de `lleonalmaza@gmail.com` ya se asignó y verificó. No es un administrador de Supabase ni del checador. Las funciones antiguas `deriva-billing-sync` y `deriva-revenuecat` se conservan por compatibilidad, pero sus entitlements ya no autorizan publicaciones remotas y no forman parte del cliente actual.
+Ese rol pertenece solo a Deriva. No otorga administración del proyecto Supabase ni de otras aplicaciones que compartan la base. Las funciones antiguas `deriva-billing-sync` y `deriva-revenuecat` se conservan por compatibilidad, pero sus entitlements ya no autorizan publicaciones remotas y no forman parte del cliente actual.
 
 ## Activar y controlar el worker
 
@@ -86,4 +86,4 @@ Las tres suites pasaron en PostgreSQL alojado. Sus fixtures se revirtieron: el e
 
 Los dos endpoints Stripe pasaron Deno check y las pruebas unitarias de firma/pago. Los endpoints v3 rechazan Checkout sin sesión (401) y webhook sin firma (400); un evento sintético firmado e ignorable devolvió 200 sin conceder créditos. El retorno es informativo. Stripe y Vault están configurados para prueba. La transacción completa desde Expo Go y los sensores siguen pendientes de comprobar en un teléfono.
 
-El advisor reportó seis INFO por RLS sin políticas en tablas privadas/cola, deliberadamente inaccesibles a clientes, y el WARN preexistente de protección de contraseñas filtradas desactivada en Auth compartido. [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). No se cambiaron políticas de asistencia ni configuración compartida de Auth.
+El advisor reportó seis INFO por RLS sin políticas en tablas privadas/cola, deliberadamente inaccesibles a clientes, y un WARN preexistente de protección de contraseñas filtradas desactivada en Auth. [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). No se cambiaron políticas ni la configuración de Auth que ya existían.

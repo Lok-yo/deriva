@@ -344,7 +344,7 @@ select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4
 
 reset role;
 select pg_temp.set_claims(null, 'service_role');
-select public.deriva_configure_push('https://kqabddlasmvipuskvnvr.supabase.co/functions/v1/deriva-push-worker');
+select public.deriva_configure_push('https://exampleprojectref000.supabase.co/functions/v1/deriva-push-worker');
 select pg_temp.assert_true((select count(*) = 1 from cron.job where jobname='deriva-push' and schedule='* * * * *' and command='select deriva_private.invoke_push_worker();'),
   'explicit configuration schedules exactly the Deriva worker without embedding its secret');
 -- pg_net does not dispatch requests before commit. This invocation is rolled back.
@@ -353,7 +353,7 @@ do $$
 declare v_token text;
 begin
   select q.headers ->> 'x-deriva-job-token' into v_token from net.http_request_queue q
-  where q.url='https://kqabddlasmvipuskvnvr.supabase.co/functions/v1/deriva-push-worker'
+  where q.url='https://exampleprojectref000.supabase.co/functions/v1/deriva-push-worker'
     and q.xmin = pg_current_xact_id()::xid
   order by q.id desc limit 1;
   perform pg_temp.assert_true(char_length(v_token) = 72, 'scheduled request has a random one-time token');

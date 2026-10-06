@@ -10,7 +10,7 @@ El plan gratuito publica desde una lectura actual del GPS y una foto de cámara 
 
 ## Backend
 
-Usar el proyecto Supabase conectado, conservando sus tablas de asistencia. Nuevas tablas/RPC con prefijo `deriva_`, esquema privado `deriva_private` y bucket privado `deriva-photos`. Auth comparte el proyecto: el trigger existente crea también un perfil de asistencia durante signup y requiere `full_name`; Deriva lo suministra, sin modificar el trigger.
+Usar el proyecto Supabase conectado y conservar las tablas que ya existan. Nuevas tablas y RPC con prefijo `deriva_`, esquema privado `deriva_private` y bucket privado `deriva-photos`. Si el trigger de altas exige `full_name`, Deriva lo envía y no modifica ese trigger.
 
 RLS aísla cuentas, guardados, tokens, preferencias y notificaciones. Los lugares son visibles para usuarios autenticados. Solo una RPC crea lugares, verifica la suscripción desde la tabla de derechos protegida y valida coordenadas, precisión y antigüedad del GPS, origen declarado y biometría declarada. Expo no ofrece prueba criptográfica de GPS/cámara/biometría contra un cliente modificado; esa limitación se documenta. Las fotos se comprimen a JPEG, sin EXIF, y se leen con URL firmada.
 

@@ -4,16 +4,16 @@ Cada pago habilita **una publicación remota por 1 USD**. Las publicaciones loca
 
 ## Configuración
 
-La cuenta de prueba **New business** (`acct_1QuHMoK6FTj0u2Hi`) contiene el precio `price_1UN2EfK6FTj0u2HihYAkVh0z`, Payment Link `plink_1UN2EpK6FTj0u2HiL3FSTIZy` y webhook `we_1UN2F6K6FTj0u2HiyGTGmTe3`. El webhook tiene API `2026-08-26.dahlia` y eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `charge.refunded`.
+Stripe de prueba usa un precio fijo de 100 centavos USD, un Payment Link y un webhook. El webhook usa la API `2026-08-26.dahlia` y los eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded` y `charge.refunded`. Los identificadores de esa cuenta no van en el repositorio: el servidor los guarda en configuración privada.
 
 El servidor guarda el enlace y el secreto de firma en configuración privada y **Supabase Vault**. No necesitas compartir una clave API ni agregar secretos a `.env` de Expo. El secreto del webhook tampoco aparece en este repositorio.
 
 ## Probar desde Expo Go
 
-1. Inicia Expo por tu cuenta y abre Deriva en el teléfono.
-2. Inicia sesión con una cuenta sin rol admin ni crédito disponible. Toca un punto vacío y elige publicar allí por 1 USD.
+1. Abre Deriva en el teléfono, en Expo Go o en el APK de `preview`.
+2. Inicia sesión con una cuenta sin rol de administrador ni crédito disponible. Toca un punto vacío y elige publicar allí por 1 USD.
 3. Abre el pago desde Deriva y usa la tarjeta de prueba `4242 4242 4242 4242`, fecha futura y CVC de tres dígitos. No se realizan cargos reales.
-4. Regresa a Expo Go. El webhook confirma el crédito y la app actualiza el acceso.
+4. Vuelve a Deriva. El webhook confirma el crédito y la app actualiza el acceso.
 5. Publicar consume un crédito. Otro punto remoto necesita otro pago; un crédito disponible evita un cobro adicional.
 
 La prueba integral en un teléfono sigue pendiente: provisionar Stripe o pasar pruebas automatizadas no sustituye esa comprobación.

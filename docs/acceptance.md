@@ -1,6 +1,6 @@
 # Aceptación de Deriva
 
-La fase actual se prueba en **Expo Go para Android e iOS**. El usuario inicia el servidor. Exportar paquetes Android/iOS y revisar la interfaz auxiliar en navegador no demuestra la ejecución ni los sensores del teléfono.
+La prueba en teléfono puede hacerse en **Expo Go** o en el APK de `preview`. Exportar paquetes Android/iOS y revisar la interfaz auxiliar en navegador no demuestra la ejecución ni los sensores del teléfono.
 
 ## Cambios actuales
 
@@ -21,9 +21,9 @@ Verificación del 4 de octubre de 2026:
 | Supabase alojado | Tres suites SQL pasaron con ROLLBACK; 2 usuarios, 3 lugares y 0 compras conservados; admin solicitado verificado |
 | Edge Functions Stripe | Deno check correcto; endpoints v3 activos: Checkout sin sesión 401, webhook sin firma 400 y evento sintético firmado ajeno al pago 200/ignored |
 | Stripe completo | Cuenta de prueba, precio, enlace y webhook provisionados; configuración real conservada tras SQL. Prueba con tarjeta desde el teléfono pendiente |
-| Teléfono físico | Pendiente de probar en Expo Go iniciado por el usuario |
+| Teléfono físico | Pendiente de probar en Expo Go o en el APK de `preview` |
 
-Evidencia local en `verification/dark-export`, `verification/dark-web`, `verification/publication-fixtures` y `verification/stripe-runtime-report.json`. `scripts/verify_publication.py` intercepta todas las solicitudes Supabase y WebSockets para probar la interfaz sin escribir datos reales ni simular una prueba de sensores físicos. Las tres suites SQL terminan en `ROLLBACK` y no usan pagos reales. La prueba sintética del webhook comprueba firma y recepción sin registrar créditos; no equivale a completar un pago con tarjeta. Expo puede estar iniciado por el usuario; la verificación no lo inicia ni lo detiene.
+Evidencia local en `verification/dark-export`, `verification/dark-web`, `verification/publication-fixtures` y `verification/stripe-runtime-report.json`. `scripts/verify_publication.py` intercepta todas las solicitudes Supabase y WebSockets para probar la interfaz sin escribir datos reales ni simular una prueba de sensores físicos. Las tres suites SQL terminan en `ROLLBACK` y no usan pagos reales. La prueba sintética del webhook comprueba firma y recepción sin registrar créditos; no equivale a completar un pago con tarjeta. La verificación no inicia ni detiene el servidor de desarrollo.
 
 Las comprobaciones anteriores al cambio de modelo pasaron TypeScript, ESLint, 65 pruebas y paquetes Android/iOS/web. Se había verificado Storage, RLS, Auth, Realtime y el worker de push. Esos resultados son historial; las suscripciones Premium anteriores ya no autorizan publicaciones remotas.
 
@@ -31,7 +31,7 @@ Las comprobaciones anteriores al cambio de modelo pasaron TypeScript, ESLint, 65
 
 Registrar modelo, sistema y versión de Expo Go junto con cada resultado.
 
-- [ ] Abrir desde el QR iniciado por el usuario: aparece el mapa y se solicita ubicación en primer plano.
+- [ ] Abrir la app: aparece el mapa y se solicita ubicación en primer plano.
 - [ ] Con permiso, el mapa se centra en el teléfono. Si se rechaza o el GPS está apagado, se puede explorar y reintentar sin simular la posición.
 - [ ] Ver cartografía oscura y pins `?`; no confundir el fondo oscuro con teselas que no cargan. Probar gestos y recarga tras perder internet.
 - [ ] Navegar entre las tres pestañas sin desplazamiento lateral. Perfil no muestra Guardados ni Premium.
@@ -52,11 +52,11 @@ Android necesita huella compatible con autenticación fuerte. iOS Expo Go admite
 
 ## Administrador y Stripe de prueba
 
-- [ ] Iniciar sesión con `lleonalmaza@gmail.com`: Perfil muestra Administrador.
+- [ ] Iniciar sesión con una cuenta a la que el servidor asignó rol de administrador: Perfil muestra Administrador.
 - [ ] Tocar un espacio vacío como administrador: ofrece agregar gratis; permite foto de galería y publica en el punto sin consumir pagos.
 - [ ] Con otra cuenta, tocar un espacio vacío: aparece el precio **1 USD por publicación**, antes de abrir Checkout.
 - [ ] Una firma incorrecta, ticket ajeno, importe alterado o evento real no concede crédito.
-- [ ] Con Stripe de prueba configurado, completar Checkout con una tarjeta de prueba de Stripe; volver a Expo Go y esperar la confirmación del servidor.
+- [ ] Con Stripe de prueba configurado, completar Checkout con una tarjeta de prueba de Stripe; volver a Deriva y esperar la confirmación del servidor.
 - [ ] Cancelar Checkout no concede acceso. Abrir directamente la URL de retorno tampoco.
 - [ ] Tras pagar, publicar una ubicación remota consume un solo crédito; un segundo punto requiere otro pago. Un crédito pendiente no provoca un cobro duplicado.
 - [ ] Repetir el webhook o el envío de publicación no duplica créditos ni lugares. Un reembolso revoca el crédito disponible, incluso si llega antes del evento de pago.
@@ -87,10 +87,10 @@ La pila `ContextNavigator → ExpoRoot` coincide con el [fallo de inicializació
 
 Las cinco pruebas nuevas ejecutan el componente compilado del SDK con ciclos de hooks controlados. Reproducen la escritura antes de montaje en el código original y comprueban que el parche la aplaza hasta el efecto; también cubren enlace síncrono, enlaces posteriores, resolución tardía tras desmontaje e idempotencia. Pasaron las cinco, TypeScript y ESLint; la suite completa pasó 92/92 pruebas y la exportación Android/iOS/web quedó en `verification/router-mount-export`. No sustituyen la comprobación del regreso real en Android.
 
-Para que Metro abandone la copia de la dependencia que tenía en caché, el usuario debe detener su servidor de Expo en la terminal y reiniciarlo personalmente desde la carpeta `deriva`:
+Para que Metro abandone la copia de la dependencia que tenía en caché, detén el servidor de Expo y vuelve a iniciarlo:
 
 ```sh
 npm start -- --clear
 ```
 
-Después, abrir Deriva en Expo Go y terminar el punto con el pago ya disponible. Falta confirmar en el teléfono que regresar de Stripe ya no produce el aviso. La corrección no inicia ni detiene el servidor de Expo del usuario.
+Después, abre Deriva y termina el punto con el pago ya disponible. Falta confirmar en el teléfono que regresar de Stripe ya no produce el aviso.
