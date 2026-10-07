@@ -2,17 +2,13 @@ import type { Place, Position, Profile, PublishDraft } from '../domain/models';
 import { encodePhoto } from './photos';
 import { requireSessionFor, requireSupabase } from './supabase';
 
-export async function fetchPlaces(extraIds: string[] = []): Promise<Place[]> {
+type PlaceRow = Omit<Place, 'photoUrl' | 'authorName'>;
+
+export async function fetchPlaces(): Promise<Place[]> {
   const client = requireSupabase();
   const { data, error } = await client.from('deriva_places').select('*').order('created_at', { ascending: false }).limit(300);
   if (error) throw error;
-  const rows = data ?? [];
-  const missing = [...new Set(extraIds)].filter(id => !rows.some(place => place.id === id));
-  for (let start = 0; start < missing.length; start += 100) {
-    const additional = await client.from('deriva_places').select('*').in('id', missing.slice(start, start + 100));
-    if (additional.error) throw additional.error;
-    rows.push(...additional.data ?? []);
-  }
+  const rows = (data ?? []) as PlaceRow[];
   if (!rows.length) return [];
   const owners = [...new Set(rows.map(place => String(place.owner_id)))];
   const profileChunks = await Promise.all(Array.from({ length: Math.ceil(owners.length / 100) }, (_, index) => client.from('deriva_profiles').select('user_id, display_name').in('user_id', owners.slice(index * 100, index * 100 + 100))));
@@ -23,20 +19,24 @@ export async function fetchPlaces(extraIds: string[] = []): Promise<Place[]> {
   // Storage can fail per file even when its batch response has no global error.
   // Keep the place visible; the photo component offers an explicit retry.
   const photos = new Map((signed ?? []).map(photo => [photo.path, photo.error ? '' : photo.signedUrl ?? '']));
-  return rows.map(place => ({ ...place, photoUrl: photos.get(place.photo_path) ?? '', authorName: names.get(place.owner_id) ?? 'Explorador' }) as Place);
+  return rows.map(place => ({ ...place, photoUrl: photos.get(place.photo_path) ?? '', authorName: names.get(place.owner_id) ?? 'Explorador' }));
 }
 
 export async function fetchPlace(id: string): Promise<Place | null> {
-  const client = requireSupabase();
-  const { data, error } = await client.from('deriva_places').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await requireSupabase().from('deriva_places').select('*').eq('id', id).maybeSingle();
   if (error) throw error;
-  if (!data) return null;
+  return data ? hydratePlace(data as PlaceRow) : null;
+}
+
+// Completes a row received from Realtime without reading the table again.
+export async function hydratePlace(row: PlaceRow, knownAuthor?: string): Promise<Place> {
+  const client = requireSupabase();
   const [profile, photo] = await Promise.all([
-    client.from('deriva_profiles').select('display_name').eq('user_id', data.owner_id).maybeSingle(),
-    client.storage.from('deriva-photos').createSignedUrl(data.photo_path, 3600),
+    knownAuthor ? null : client.from('deriva_profiles').select('display_name').eq('user_id', row.owner_id).maybeSingle(),
+    client.storage.from('deriva-photos').createSignedUrl(row.photo_path, 3600),
   ]);
-  if (profile.error) throw profile.error;
-  return { ...data, photoUrl: photo.error ? '' : photo.data?.signedUrl ?? '', authorName: profile.data?.display_name ?? 'Explorador' } as Place;
+  if (profile?.error) throw profile.error;
+  return { ...row, photoUrl: photo.error ? '' : photo.data?.signedUrl ?? '', authorName: knownAuthor ?? profile?.data?.display_name ?? 'Explorador' };
 }
 
 export async function ensureProfile(userId: string, name: string): Promise<Profile> {

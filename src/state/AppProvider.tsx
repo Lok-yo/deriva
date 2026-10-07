@@ -1,13 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState as NativeAppState } from 'react-native';
-import type { Session } from '@supabase/supabase-js';
+import type { RealtimePostgresChangesPayload, Session } from '@supabase/supabase-js';
 import type { AppNotification, ConnectionState, Place, Profile, PublicationAccess } from '../domain/models';
 import type { AppState } from './contracts';
 import { isPreviewPlace, previewPlaces } from '../data/preview';
 import { useMapLocation } from './useMapLocation';
 import { publicationAccess, resolvePublicationDraft, validatePublication } from '../domain/publication';
 import { friendlyError, requireSessionFor, requireSupabase, supabase } from '../services/supabase';
-import { ensureProfile, fetchPlaces, publishPlace } from '../services/places';
+import { ensureProfile, fetchPlace, fetchPlaces, hydratePlace, publishPlace } from '../services/places';
 import { getCurrentPosition } from '../services/sensors';
 import { canRegisterPush, registerPushToken, unregisterPushToken } from '../services/notifications';
 import { openRemoteCheckout } from '../services/checkout';
@@ -27,25 +27,30 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   const [loadedUser, setLoadedUser] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const placesRef = useRef(places);
+  useEffect(() => { placesRef.current = places; }, [places]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [access, setAccess] = useState<PublicationAccess>({ isAdmin: false, remoteCredits: 0 });
   const [connection, setConnection] = useState<ConnectionState>('preview');
   const [error, setError] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationRadius, setNotificationRadius] = useState(10);
-  const sequence = useRef(0);
+  const accountSequence = useRef(0);
+  const placesSequence = useRef(0);
+  const placesRun = useRef<Promise<void> | null>(null);
+  const placesStale = useRef(false);
+  const placesLoadedAt = useRef(0);
   const realtimeConnected = useRef(false);
-  const dataHealthy = useRef(false);
+  const healthy = useRef({ account: false, places: false });
   const signingOutUser = useRef<string | null>(null);
   const updatingPushUser = useRef<string | null>(null);
 
   const acceptSession = useCallback((nextSession: Session | null) => {
     if (sessionRef.current?.user.id !== nextSession?.user.id) {
-      sequence.current += 1;
-      setLoadedUser(null); setProfile(null); setPlaces([]); setSavedIds([]); setNotifications([]);
+      accountSequence.current += 1; placesSequence.current += 1; placesLoadedAt.current = 0;
+      setLoadedUser(null); setProfile(null); setPlaces([]); setNotifications([]);
       setAccess({ isAdmin: false, remoteCredits: 0 }); setError(null); setNotificationsEnabled(false);
-      realtimeConnected.current = false; dataHealthy.current = false;
+      realtimeConnected.current = false; healthy.current = { account: false, places: false };
       setConnection(nextSession ? 'connecting' : 'preview');
     }
     sessionRef.current = nextSession;
@@ -67,58 +72,124 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     return () => { disposed = true; subscription.unsubscribe(); };
   }, [acceptSession]);
 
-  const refresh = useCallback(async () => {
+  const settle = useCallback((part: 'account' | 'places', cause?: unknown) => {
+    healthy.current[part] = cause === undefined;
+    if (cause !== undefined) { setError(friendlyError(cause).message); setConnection('offline'); return; }
+    if (healthy.current.account && healthy.current.places) { setError(null); setConnection(realtimeConnected.current ? 'live' : 'connecting'); }
+  }, []);
+
+  // Small, user-scoped queries: profile, inbox, alerts and publication access.
+  const refreshAccount = useCallback(async () => {
     const user = sessionRef.current?.user;
     if (!user || !supabase) return;
-    const current = ++sequence.current;
+    const current = ++accountSequence.current;
     try {
-      const [nextProfile, saved, inbox, preference, access] = await Promise.all([
+      const [nextProfile, inbox, preference, access] = await Promise.all([
         ensureProfile(user.id, String(user.user_metadata.full_name ?? 'Explorador')),
-        supabase.from('deriva_saved_places').select('place_id').eq('user_id', user.id),
         supabase.from('deriva_notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
         supabase.from('deriva_notification_preferences').select('*').eq('user_id', user.id).maybeSingle(),
         supabase.rpc('deriva_get_access'),
       ]);
-      for (const result of [saved, inbox, preference, access]) if (result.error) throw result.error;
-      const nextIds = (saved.data ?? []).map(item => String(item.place_id));
-      const nextNotifications = (inbox.data ?? []) as AppNotification[];
-      const nextPlaces = await fetchPlaces([...nextIds, ...nextNotifications.flatMap(item => item.place_id ? [item.place_id] : [])]);
-      if (current !== sequence.current || user.id !== sessionRef.current?.user.id) return;
-      setProfile(nextProfile); setPlaces(nextPlaces); setSavedIds(nextIds); setNotifications(nextNotifications);
+      for (const result of [inbox, preference, access]) if (result.error) throw result.error;
+      if (current !== accountSequence.current || user.id !== sessionRef.current?.user.id) return;
+      setProfile(nextProfile); setNotifications((inbox.data ?? []) as AppNotification[]);
       setAccess(publicationAccess(access.data)); setNotificationsEnabled(preference.data?.enabled === true); setNotificationRadius(preference.data?.radius_km ?? 10);
-      setLoadedUser(user.id); setError(null); dataHealthy.current = true;
-      setConnection(realtimeConnected.current ? 'live' : 'connecting');
+      setLoadedUser(user.id); settle('account');
     } catch (cause) {
-      if (current !== sequence.current || user.id !== sessionRef.current?.user.id) return;
-      dataHealthy.current = false; setError(friendlyError(cause).message); setConnection('offline');
+      if (current !== accountSequence.current || user.id !== sessionRef.current?.user.id) return;
+      settle('account', cause);
     }
+  }, [settle]);
+
+  const loadPlaces = useCallback(async () => {
+    const user = sessionRef.current?.user;
+    if (!user || !supabase) return;
+    const current = ++placesSequence.current;
+    try {
+      const nextPlaces = await fetchPlaces();
+      if (current !== placesSequence.current || user.id !== sessionRef.current?.user.id) return;
+      setPlaces(nextPlaces); placesLoadedAt.current = Date.now(); settle('places');
+    } catch (cause) {
+      if (current !== placesSequence.current || user.id !== sessionRef.current?.user.id) return;
+      settle('places', cause);
+    }
+  }, [settle]);
+
+  // The full map query is the expensive one: concurrent requests share one run,
+  // and a request that arrives mid-run triggers exactly one more pass.
+  const refreshPlaces = useCallback((): Promise<void> => {
+    if (placesRun.current) { placesStale.current = true; return placesRun.current; }
+    const run = (async () => {
+      try { do { placesStale.current = false; await loadPlaces(); } while (placesStale.current); }
+      finally { placesRun.current = null; }
+    })();
+    placesRun.current = run;
+    return run;
+  }, [loadPlaces]);
+
+  const refresh = useCallback(async () => { await Promise.all([refreshAccount(), refreshPlaces()]); }, [refreshAccount, refreshPlaces]);
+
+  const upsertPlace = useCallback((place: Place) => {
+    setPlaces(list => list.some(item => item.id === place.id) ? list.map(item => item.id === place.id ? place : item) : [place, ...list]);
+  }, []);
+
+  // Apply another user's change to one place instead of reloading the whole map.
+  const applyPlaceChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+    if (placesRun.current) { placesStale.current = true; return; }
+    if (payload.eventType === 'DELETE') {
+      const id = payload.old.id;
+      if (typeof id === 'string') setPlaces(list => list.filter(place => place.id !== id));
+      return;
+    }
+    const row = payload.new as Omit<Place, 'photoUrl' | 'authorName'>;
+    if (typeof row.id !== 'string') return;
+    const userId = sessionRef.current?.user.id;
+    const epoch = placesSequence.current;
+    const knownAuthor = placesRef.current.find(place => place.owner_id === row.owner_id)?.authorName;
+    void hydratePlace(row, knownAuthor).then(place => {
+      if (epoch === placesSequence.current && userId === sessionRef.current?.user.id) upsertPlace(place);
+    }).catch(() => { void refreshPlaces(); });
+  }, [refreshPlaces, upsertPlace]);
+
+  const applyProfileChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+    if (payload.eventType === 'DELETE') return;
+    const { user_id: userId, display_name: name } = payload.new;
+    if (typeof userId !== 'string' || typeof name !== 'string') return;
+    setPlaces(list => list.some(place => place.owner_id === userId) ? list.map(place => place.owner_id === userId ? { ...place, authorName: name } : place) : list);
+    if (userId === sessionRef.current?.user.id) setProfile(current => current ? { ...current, display_name: name } : current);
   }, []);
 
   useEffect(() => {
     const userId = session?.user.id;
     if (!userId || !supabase) return;
-    void refresh();
-    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-    const scheduleRefresh = () => { clearTimeout(refreshTimer); refreshTimer = setTimeout(() => { void refresh(); }, 250); };
+    // The map loads once the channel is subscribed, so no change slips between both.
+    void refreshAccount();
+    const fallback = setTimeout(() => { if (!realtimeConnected.current) void refreshPlaces(); }, 5000);
+    let accountTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleAccount = () => { clearTimeout(accountTimer); accountTimer = setTimeout(() => { void refreshAccount(); }, 250); };
     const channel = supabase.channel(`deriva:${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_places' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_profiles' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_roles', filter: `user_id=eq.${userId}` }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_remote_purchases', filter: `user_id=eq.${userId}` }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_saved_places', filter: `user_id=eq.${userId}` }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notifications', filter: `user_id=eq.${userId}` }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notification_preferences', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_places' }, applyPlaceChange)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'deriva_profiles' }, applyProfileChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_roles', filter: `user_id=eq.${userId}` }, scheduleAccount)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_remote_purchases', filter: `user_id=eq.${userId}` }, scheduleAccount)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notifications', filter: `user_id=eq.${userId}` }, scheduleAccount)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notification_preferences', filter: `user_id=eq.${userId}` }, scheduleAccount)
       .subscribe(status => {
         if (sessionRef.current?.user.id !== userId) return;
         realtimeConnected.current = status === 'SUBSCRIBED';
-        if (status === 'SUBSCRIBED') { setConnection(dataHealthy.current ? 'live' : 'connecting'); scheduleRefresh(); }
-        else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) setConnection('offline');
+        // A (re)subscription may have missed events, so reconcile everything once.
+        if (status === 'SUBSCRIBED') { setConnection(healthy.current.account && healthy.current.places ? 'live' : 'connecting'); void refresh(); }
+        else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) { setConnection('offline'); if (!placesLoadedAt.current) void refreshPlaces(); }
       });
-    const foreground = NativeAppState.addEventListener('change', state => { if (state === 'active') scheduleRefresh(); });
-    // Refresh signed photo URLs and reconcile changes after a dropped channel.
-    const reconcile = setInterval(() => { if (NativeAppState.currentState === 'active') void refresh(); }, 60000);
-    return () => { clearTimeout(refreshTimer); clearInterval(reconcile); foreground.remove(); void supabase?.removeChannel(channel); };
-  }, [session?.user.id, refresh]);
+    const foreground = NativeAppState.addEventListener('change', state => { if (state === 'active') void refresh(); });
+    // Account data is cheap to poll; the map only reloads before its signed photo URLs (1 h) expire.
+    const reconcile = setInterval(() => {
+      if (NativeAppState.currentState !== 'active') return;
+      void refreshAccount();
+      if (Date.now() - placesLoadedAt.current > 30 * 60 * 1000) void refreshPlaces();
+    }, 60000);
+    return () => { clearTimeout(fallback); clearTimeout(accountTimer); clearInterval(reconcile); foreground.remove(); void supabase?.removeChannel(channel); };
+  }, [session?.user.id, refresh, refreshAccount, refreshPlaces, applyPlaceChange, applyProfileChange]);
 
   useEffect(() => {
     const userId = session?.user.id;
@@ -158,7 +229,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   const value: AppState = {
     ready, session, profile: belongsToSession ? profile : null, isPreview: !session,
     places: belongsToSession ? [...previewPlaces, ...places] : previewPlaces,
-    savedIds: belongsToSession ? savedIds : [], notifications: belongsToSession ? notifications : [],
+    notifications: belongsToSession ? notifications : [],
     isAdmin: belongsToSession && access.isAdmin, remoteCredits: belongsToSession ? access.remoteCredits : 0, connection: session ? connection : 'preview', error,
     notificationsEnabled: belongsToSession && (notificationsEnabled || access.isAdmin), notificationRadius, refresh,
     mapLocation: navigationLocation.location, startMapLocation: navigationLocation.start, locateMap: navigationLocation.locate,
@@ -184,13 +255,6 @@ export function AppProvider({ children }: React.PropsWithChildren) {
         if (!sessionRef.current || sessionRef.current.user.id === user.id) acceptSession(null);
       } finally { if (signingOutUser.current === user.id) signingOutUser.current = null; }
     }),
-    toggleSaved: id => handle(async () => {
-      if (isPreviewPlace(id)) throw new Error('Este lugar es un ejemplo local y no se puede guardar en tu cuenta.');
-      const user = currentUser(); const client = requireSupabase();
-      const result = savedIds.includes(id) ? await client.from('deriva_saved_places').delete().eq('user_id', user.id).eq('place_id', id) : await client.from('deriva_saved_places').upsert({ user_id: user.id, place_id: id }, { onConflict: 'user_id,place_id', ignoreDuplicates: true });
-      if (result.error) throw result.error;
-      await refresh();
-    }),
     publish: draft => handle(async () => {
       const user = currentUser();
       const bound = await requireSessionFor(user.id, () => isSameSession(user.id));
@@ -198,7 +262,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       const existing = await client.from('deriva_places').select('id').eq('id', draft.requestId).eq('owner_id', user.id).maybeSingle();
       if (existing.error) throw existing.error;
       await bound.assertCurrent();
-      if (existing.data) { await refresh(); return existing.data.id as string; }
+      if (existing.data) { await refreshAccount(); return existing.data.id as string; }
       const gps = draft.mode === 'local' ? await getCurrentPosition() : null;
       const latestAccess = await client.rpc('deriva_get_access');
       if (latestAccess.error) throw latestAccess.error;
@@ -206,7 +270,8 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       const currentDraft = resolvePublicationDraft(draft, gps);
       const validated = validatePublication(currentDraft, publicationAccess(latestAccess.data), gps);
       const id = await publishPlace(user.id, validated, gps, () => isSameSession(user.id));
-      await refresh();
+      const [place] = await Promise.all([fetchPlace(id), refreshAccount()]);
+      if (place && isSameSession(user.id)) upsertPlace(place);
       return id;
     }),
     deletePlace: id => handle(async () => {
@@ -215,13 +280,14 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       const removed = await client.from('deriva_places').delete().eq('id', id).eq('owner_id', user.id).select('photo_path').single();
       if (removed.error) throw removed.error;
       await client.storage.from('deriva-photos').remove([removed.data.photo_path]);
-      await refresh();
+      setPlaces(list => list.filter(place => place.id !== id));
     }),
     markNotificationRead: id => handle(async () => {
       const user = currentUser();
-      const result = await requireSupabase().from('deriva_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id);
+      const readAt = new Date().toISOString();
+      const result = await requireSupabase().from('deriva_notifications').update({ read_at: readAt }).eq('id', id).eq('user_id', user.id);
       if (result.error) throw result.error;
-      await refresh();
+      if (isSameSession(user.id)) setNotifications(list => list.map(item => item.id === id ? { ...item, read_at: readAt } : item));
     }),
     setNotificationPreferences: (enabled, radiusKm) => handle(async () => {
       const user = currentUser();
@@ -250,20 +316,20 @@ export function AppProvider({ children }: React.PropsWithChildren) {
           await unregisterPushToken(user.id);
         }
         await bound.assertCurrent();
-        await refresh();
+        await refreshAccount();
       } finally { if (updatingPushUser.current === user.id) updatingPushUser.current = null; }
     }),
     openRemoteCheckout: requestId => handle(async () => {
       const user = currentUser();
       try { await openRemoteCheckout(user.id, requestId, () => isSameSession(user.id)); }
-      finally { if (isSameSession(user.id)) await refresh(); }
+      finally { if (isSameSession(user.id)) await refreshAccount(); }
     }),
     updateDisplayName: name => handle(async () => {
       const user = currentUser();
       if (name.trim().length < 2 || name.trim().length > 60) throw new Error('Tu nombre debe tener entre 2 y 60 caracteres.');
       const result = await requireSupabase().from('deriva_profiles').update({ display_name: name.trim() }).eq('user_id', user.id);
       if (result.error) throw result.error;
-      await refresh();
+      await refreshAccount();
     }),
   };
   return <Context.Provider value={value}>{children}</Context.Provider>;

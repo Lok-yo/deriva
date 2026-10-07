@@ -35,9 +35,6 @@ yarn-error.*
 .env.*
 !.env.example
 .env*.local
-verification/
-test-results/
-playwright-report/
 google-services.json
 supabase/.temp/
 

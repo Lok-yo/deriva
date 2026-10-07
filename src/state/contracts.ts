@@ -8,7 +8,6 @@ export type AppState = {
   profile: Profile | null;
   isPreview: boolean;
   places: Place[];
-  savedIds: string[];
   notifications: AppNotification[];
   isAdmin: boolean;
   remoteCredits: number;
@@ -23,7 +22,6 @@ export type AppState = {
   signIn(email: string, password: string): Promise<void>;
   signUp(name: string, email: string, password: string): Promise<{ needsEmailConfirmation: boolean }>;
   signOut(): Promise<void>;
-  toggleSaved(id: string): Promise<void>;
   publish(draft: PublicationInput): Promise<string>;
   deletePlace(id: string): Promise<void>;
   markNotificationRead(id: string): Promise<void>;

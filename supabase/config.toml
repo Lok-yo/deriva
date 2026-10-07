@@ -38,12 +38,6 @@ enable_confirmations = false
 
 # Each function verifies its own signed user token or dedicated server secret.
 # Publishable API keys are not JWTs and cannot satisfy the gateway JWT check.
-[functions.deriva-billing-sync]
-verify_jwt = false
-
-[functions.deriva-revenuecat]
-verify_jwt = false
-
 [functions.deriva-push-worker]
 verify_jwt = false
 

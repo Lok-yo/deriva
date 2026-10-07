@@ -38,7 +38,7 @@ npx --yes supabase@2.119.0 functions deploy deriva-remote-checkout deriva-stripe
 | `deriva-stripe-webhook` | HMAC-SHA256 de Stripe sobre cuerpo original, ventana de cinco minutos y comprobación de evento pagado de prueba |
 | `deriva-push-worker` | Token de trabajo de un solo uso validado por RPC |
 
-[Guía de configuración y prueba de Stripe](../docs/stripe-pruebas.md). La app vuelve a consultar acceso al regresar al primer plano; no confía en parámetros del navegador para confirmar el pago.
+Para probar un pago, usa la tarjeta `4242 4242 4242 4242` con una fecha futura y cualquier CVC de tres dígitos. La app vuelve a consultar acceso al regresar al primer plano; no confía en parámetros del navegador para confirmar el pago.
 
 `deriva_roles` y `deriva_remote_purchases` tienen RLS y lectura exclusiva del propietario. Los clientes no pueden escribir ni concederse privilegios. `deriva_get_access()` devuelve `is_admin` y `remote_credits`. `deriva_create_place_v2` crea el lugar y consume un solo crédito en la misma transacción. Reintentos, reembolsos y cambios de rol se serializan; los identificadores sobreviven a la eliminación del lugar.
 
@@ -48,7 +48,7 @@ Para asignar un administrador de Deriva, desde una conexión de servicio/adminis
 select public.deriva_set_admin('UUID_DE_LA_CUENTA', true);
 ```
 
-Ese rol pertenece solo a Deriva. No otorga administración del proyecto Supabase ni de otras aplicaciones que compartan la base. Las funciones antiguas `deriva-billing-sync` y `deriva-revenuecat` se conservan por compatibilidad, pero sus entitlements ya no autorizan publicaciones remotas y no forman parte del cliente actual.
+Ese rol pertenece solo a Deriva. No otorga administración del proyecto Supabase ni de otras aplicaciones que compartan la base.
 
 ## Activar y controlar el worker
 

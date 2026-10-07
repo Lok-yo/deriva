@@ -38,7 +38,7 @@ test('RPC, eliminación y verificación usan el JWT capturado en vez del de una 
   });
   await client.rpc('deriva_register_push_token', { p_token: 'ExpoPushToken[test]' });
   await client.from('deriva_push_tokens').delete().eq('user_id', accountA).eq('token', 'ExpoPushToken[test]');
-  await client.functions.invoke('deriva-billing-sync', { body: {} });
+  await client.functions.invoke('deriva-remote-checkout', { body: {} });
   assert.deepEqual(authorizations, ['Bearer jwt-account-A', 'Bearer jwt-account-A', 'Bearer jwt-account-A']);
 });
 
