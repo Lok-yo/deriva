@@ -1,6 +1,6 @@
 # Deriva
 
-Aplicación móvil para publicar y encontrar lugares en un mapa. Está hecha con React Native y Expo (SDK 57) para Android e iOS. La interfaz está en español, con fondo negro, pines `?` y tres pestañas: **Mapa**, **Publicar** y **Perfil**.
+Aplicación móvil para publicar y encontrar lugares en un mapa. Está hecha con React Native y Expo (SDK 57) para Android e iOS. La interfaz está en español, con fondo negro, pines `?` y tres pestañas: **Explorar**, **Publicar** y **Perfil**.
 
 ## Empezar
 
@@ -57,6 +57,8 @@ Una publicación necesita un título de 3 a 80 caracteres y una fotografía. El 
 El pago remoto está en modo de prueba. Checkout se abre en el navegador y solo el webhook firmado habilita una publicación. Volver desde Stripe no basta. No hay suscripción ni categorías.
 
 La ficha de un lugar muestra la foto, el título y, arriba, **Activar GPS y brújula**. No se guardan datos biométricos. Hay seis lugares de ejemplo en San Luis Río Colorado: viven en la app, no en la base de datos, y no sustituyen el GPS.
+
+En **Explorar**, el mapa ordena una lista horizontal por cercanía cuando hay GPS. **A la deriva** prefiere un lugar que aún no hayas abierto y, con GPS, uno a menos de 10 km si hay alguno. Abrir la ficha cuenta como descubrimiento; el progreso se guarda solo en ese teléfono y la ficha propone el siguiente lugar cercano sin descubrir.
 
 Las cuentas pueden activar avisos de lugares cercanos. El radio por defecto es 10 km y se puede ajustar a 1, 5, 10, 25 o 50 km. El centro queda fijo al guardar la zona.
 

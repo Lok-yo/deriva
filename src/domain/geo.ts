@@ -29,3 +29,24 @@ export function chooseRandomPlace(places: Place[], origin: Coordinate | null, ra
 export function isCoordinate(value: Coordinate): boolean {
   return Number.isFinite(value.latitude) && Math.abs(value.latitude) <= 90 && Number.isFinite(value.longitude) && Math.abs(value.longitude) <= 180;
 }
+const directions = ['norte', 'noreste', 'este', 'sureste', 'sur', 'suroeste', 'oeste', 'noroeste'] as const;
+export const cardinalDirection = (bearing: number) => directions[Math.round(normalizeHeading(bearing) / 45) % 8];
+export type NearbyPlace = { place: Place; distance: number | null; bearing: number | null };
+/** Nearest first when there is an origin; otherwise keeps the incoming order. */
+export function rankNearby(places: Place[], origin: Coordinate | null): NearbyPlace[] {
+  const ranked = places.map(place => ({ place, distance: origin ? distanceMeters(origin, place) : null, bearing: origin ? bearingDegrees(origin, place) : null }));
+  return origin ? ranked.sort((a, b) => a.distance! - b.distance!) : ranked;
+}
+export const describeHeading = (item: NearbyPlace) => item.distance == null || item.bearing == null ? null : `${formatDistance(item.distance)} al ${cardinalDirection(item.bearing)}`;
+/** Drift prefers places not yet discovered, then nearby ones, and never repeats the current one when there is another. */
+export function chooseDrift(places: Place[], origin: Coordinate | null, discovered: ReadonlySet<string>, currentId: string | null, radiusKm = 10, random: () => number = Math.random): Place | null {
+  const others = places.filter(place => place.id !== currentId);
+  const pool = others.length ? others : places;
+  const fresh = pool.filter(place => !discovered.has(place.id));
+  const candidates = fresh.length ? fresh : pool;
+  return chooseRandomPlace(candidates, origin, radiusKm, random) ?? chooseRandomPlace(candidates, null, radiusKm, random);
+}
+export function nextDiscovery(places: Place[], from: Coordinate, discovered: ReadonlySet<string>, currentId: string): NearbyPlace | null {
+  const ranked = rankNearby(places.filter(place => place.id !== currentId), from);
+  return ranked.find(item => !discovered.has(item.place.id)) ?? null;
+}

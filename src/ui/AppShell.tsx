@@ -9,7 +9,7 @@ import type { IconName } from './Button';
 import { colors } from './theme';
 
 const destinations: Record<string, { title: string; icon: IconName; activeIcon: IconName }> = {
-  index: { title: 'Mapa', icon: 'map-outline', activeIcon: 'map' },
+  index: { title: 'Explorar', icon: 'compass-outline', activeIcon: 'compass' },
   publish: { title: 'Publicar', icon: 'add-circle-outline', activeIcon: 'add-circle' },
   profile: { title: 'Perfil', icon: 'person-outline', activeIcon: 'person' },
 };

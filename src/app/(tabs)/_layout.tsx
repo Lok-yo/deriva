@@ -9,7 +9,7 @@ export default function TabLayout() {
     screenOptions={{ headerShown: false, animation: 'none', sceneStyle: { backgroundColor: colors.background } }}
     tabBar={props => <DerivaTabBar {...props} />}
   >
-    <Tabs.Screen name="index" options={{ title: 'Mapa' }} />
+    <Tabs.Screen name="index" options={{ title: 'Explorar' }} />
     <Tabs.Screen name="publish" options={{ title: 'Publicar' }} />
     <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
   </Tabs>;

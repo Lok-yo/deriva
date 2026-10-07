@@ -7,7 +7,7 @@ import { PlacePhoto } from './PlacePhoto';
 import { colors, type } from './theme';
 
 
-export function PlaceRow({ place, index, distance, saved, onOpen, onSave, onRetryPhoto }: { place: Place; index?: number; distance?: number; saved: boolean; onOpen: () => void; onSave: () => void; onRetryPhoto: () => Promise<void> }) {
+export function PlaceRow({ place, index, distance, saved, onOpen, onSave, onRetryPhoto }: { place: Place; index?: number; distance?: number; saved?: boolean; onOpen: () => void; onSave?: () => void; onRetryPhoto: () => Promise<void> }) {
   return (
     <View style={styles.row}>
       <PlacePhoto uri={place.photoUrl} label={`Foto de ${place.title}`} compact style={styles.photoWrap} onOpen={onOpen} onRetry={onRetryPhoto} overlay={index != null ? <View pointerEvents="none" style={styles.index}><Text style={styles.indexText}>{String(index + 1).padStart(2, '0')}</Text></View> : undefined} />
@@ -17,7 +17,7 @@ export function PlaceRow({ place, index, distance, saved, onOpen, onSave, onRetr
           <View style={styles.meta}><Ionicons name="location-outline" color={colors.muted} size={12} /><Text style={[type.small, { fontSize: 11 }]}>{distance == null ? place.authorName : `${formatDistance(distance)} · ${place.authorName}`}</Text></View>
         </View>
       </Pressable>
-      <IconButton icon={saved ? 'bookmark' : 'bookmark-outline'} label={saved ? `Quitar ${place.title} de guardados` : `Guardar ${place.title}`} active={saved} onPress={onSave} />
+      {onSave && <IconButton icon={saved ? 'bookmark' : 'bookmark-outline'} label={saved ? `Quitar ${place.title} de guardados` : `Guardar ${place.title}`} active={saved} onPress={onSave} />}
     </View>
   );
 }

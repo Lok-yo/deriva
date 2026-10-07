@@ -12,7 +12,7 @@ Verificación del 4 de octubre de 2026:
 
 | Comprobación | Resultado |
 | --- | --- |
-| TypeScript, ESLint y reglas de dominio/Stripe/sesión/mapas | Pasaron, 92/92 pruebas |
+| TypeScript, ESLint y reglas de dominio/Stripe/sesión/mapas | Pasaron en la revisión base, 92/92 pruebas |
 | Dependencias Expo | `expo install --check` correcto |
 | Paquetes Android, iOS y web | Exportados sin abrir Expo Go ni iniciar un servidor de desarrollo |
 | Interfaz auxiliar a 320, 390, 768 y 1440 px | Sin desbordamientos, errores de página/consola ni warnings de Supabase |
@@ -22,6 +22,8 @@ Verificación del 4 de octubre de 2026:
 | Edge Functions Stripe | Deno check correcto; endpoints v3 activos: Checkout sin sesión 401, webhook sin firma 400 y evento sintético firmado ajeno al pago 200/ignored |
 | Stripe completo | Cuenta de prueba, precio, enlace y webhook provisionados; configuración real conservada tras SQL. Prueba con tarjeta desde el teléfono pendiente |
 | Teléfono físico | Pendiente de probar en Expo Go o en el APK de `preview` |
+
+Después de integrar Exploración, `npm run check` pasó el 7 de octubre de 2026: TypeScript, ESLint y 101/101 pruebas. No se repitieron las exportaciones de paquetes ni se comprobó esta función en un teléfono.
 
 Evidencia local en `verification/dark-export`, `verification/dark-web`, `verification/publication-fixtures` y `verification/stripe-runtime-report.json`. `scripts/verify_publication.py` intercepta todas las solicitudes Supabase y WebSockets para probar la interfaz sin escribir datos reales ni simular una prueba de sensores físicos. Las tres suites SQL terminan en `ROLLBACK` y no usan pagos reales. La prueba sintética del webhook comprueba firma y recepción sin registrar créditos; no equivale a completar un pago con tarjeta. La verificación no inicia ni detiene el servidor de desarrollo.
 
@@ -36,6 +38,8 @@ Registrar modelo, sistema y versión de Expo Go junto con cada resultado.
 - [ ] Ver cartografía oscura y pins `?`; no confundir el fondo oscuro con teselas que no cargan. Probar gestos y recarga tras perder internet.
 - [ ] Navegar entre las tres pestañas sin desplazamiento lateral. Perfil no muestra Guardados ni Premium.
 - [ ] Abrir un punto: título y foto, con Activar GPS y brújula arriba; sin categorías, descripciones de muestra ni enlaces de navegación externa.
+- [ ] En Explorar, comprobar que los lugares se ordenan por cercanía; abrir una ficha marca ese lugar como descubierto y actualiza el contador local.
+- [ ] Probar **A la deriva**: prefiere lugares que aún no se abrieron y uno a menos de 10 km si el GPS encuentra alguno. En la ficha, abrir el siguiente hallazgo lleva al lugar más cercano que todavía no se descubrió.
 - [ ] Activar brújula con el teléfono plano: cambia al girarlo y la distancia depende del GPS. Probar también en un ejemplo de SLRC.
 - [ ] Probar texto ampliado y TalkBack/VoiceOver; los botones deben seguir siendo accesibles.
 

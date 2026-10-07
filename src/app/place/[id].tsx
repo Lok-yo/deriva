@@ -1,17 +1,20 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { isPreviewPlace } from '../../data/preview';
+import { cardinalDirection, formatDistance, nextDiscovery } from '../../domain/geo';
 import type { Place } from '../../domain/models';
 import { fetchPlace } from '../../services/places';
 import { useApp } from '../../state/AppProvider';
+import { useDiscoveries } from '../../state/useDiscoveries';
 import { Button } from '../../ui/Button';
 import { CompassPanel } from '../../ui/CompassPanel';
 import { ConfirmDelete } from '../../ui/ConfirmDelete';
 import { EmptyState, Notice, errorMessage } from '../../ui/Feedback';
 import { Page } from '../../ui/Page';
 import { PlacePhoto } from '../../ui/PlacePhoto';
-import { colors, type } from '../../ui/theme';
+import { colors, layout, type } from '../../ui/theme';
 
 export default function PlaceDetail() {
   const { id, published } = useLocalSearchParams<{ id: string; published?: string }>();
@@ -29,6 +32,10 @@ export default function PlaceDetail() {
   const example = !!place && isPreviewPlace(place);
   const missing = !knownPlace && !hasLoaded;
   const own = !!place && !!app.session && place.owner_id === app.session.user.id;
+  const { discovered, discover } = useDiscoveries();
+  const next = place ? nextDiscovery(app.places, place, discovered, place.id) : null;
+  const placeId = place?.id;
+  useEffect(() => { if (placeId) void discover(placeId); }, [placeId, discover]);
   useEffect(() => {
     if (knownPlace || !userId || !id) return;
     let cancelled = false;
@@ -61,6 +68,18 @@ export default function PlaceDetail() {
         <Text accessibilityRole="header" style={type.title}>{place.title}</Text>
         <PlacePhoto uri={place.photoUrl} label={`Foto de ${place.title}`} style={styles.photoWrap} onRetry={retryPhoto} />
       </View>
+      {next ? <Pressable accessibilityRole="button" accessibilityLabel={`Siguiente hallazgo: ${next.place.title}, a ${formatDistance(next.distance!)} al ${cardinalDirection(next.bearing!)} de aquí`} onPress={() => router.replace({ pathname: '/place/[id]', params: { id: next.place.id } })} style={({ pressed }) => [layout.card, styles.next, pressed && { opacity: 0.7 }]}>
+        <View style={styles.mystery}><Text style={styles.mysteryMark}>?</Text></View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={type.eyebrow}>SIGUIENTE HALLAZGO</Text>
+          <Text numberOfLines={2} style={type.label}>{next.place.title}</Text>
+          <Text style={type.small}>{formatDistance(next.distance!)} al {cardinalDirection(next.bearing!)} de aquí</Text>
+        </View>
+        <Ionicons name="arrow-forward" size={21} color={colors.green} />
+      </Pressable> : <View style={[layout.card, styles.next]}>
+        <Ionicons name="trophy-outline" size={24} color={colors.green} />
+        <Text style={[type.small, { flex: 1 }]}>Ya descubriste todos los lugares del mapa. Deja tu propio ? para que alguien más lo encuentre.</Text>
+      </View>}
       {own && !example && (confirmDelete ? <ConfirmDelete title={place.title} busy={busy === 'delete'} onCancel={() => setConfirmDelete(false)} onConfirm={() => void remove()} /> : <Button label="Eliminar mi publicación" icon="trash-outline" variant="ghost" style={{ alignSelf: 'flex-start' }} onPress={() => setConfirmDelete(true)} />)}
     </> : missing && app.session ? <View style={{ padding: 48, alignItems: 'center', gap: 16 }}><ActivityIndicator color={colors.green} /><Text style={type.small}>Buscando este lugar…</Text></View> : <EmptyState title={fetchError ? 'No pudimos abrir este camino.' : app.isPreview ? 'Inicia sesión para encontrar este lugar.' : 'Este lugar ya no está en el mapa.'} body={fetchError ?? (app.isPreview ? 'Los enlaces de la comunidad necesitan una cuenta. Mientras tanto puedes explorar los ejemplos.' : 'Puede que su autor lo haya eliminado. Hay más hallazgos esperando en Explorar.')} action={fetchError ? 'Intentar de nuevo' : app.isPreview ? 'Iniciar sesión' : 'Volver a explorar'} onAction={() => fetchError ? setRetry(value => value + 1) : router.replace(app.isPreview ? '/auth' : '/')} />}
   </Page>;
@@ -69,4 +88,7 @@ export default function PlaceDetail() {
 const styles = StyleSheet.create({
   place: { gap: 16 },
   photoWrap: { aspectRatio: 1, borderRadius: 18, overflow: 'hidden' },
+  next: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
+  mystery: { width: 52, height: 52, borderRadius: 12, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+  mysteryMark: { color: colors.green, fontSize: 24, lineHeight: 28, fontWeight: '800' },
 });
