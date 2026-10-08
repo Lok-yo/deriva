@@ -1,14 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { ARRIVAL_RADIUS_M } from '../domain/exploration';
 import { bearingDegrees, distanceMeters, formatDistance, relativeHeading } from '../domain/geo';
-import type { Coordinate } from '../domain/models';
+import type { Coordinate, Position } from '../domain/models';
 import { Button } from './Button';
 import { Notice } from './Feedback';
 import { colors, layout, type } from './theme';
 import { useCompass } from './useCompass';
 
-export function CompassPanel({ destination }: { destination: Coordinate }) {
+export function CompassPanel({ destination, onPosition }: { destination: Coordinate; onPosition?: (position: Position) => void }) {
   const compass = useCompass();
+  const reading = compass.position;
+  useEffect(() => { if (reading) onPosition?.(reading); }, [reading, onPosition]);
   const distance = compass.position ? distanceMeters(compass.position, destination) : null;
   const bearing = compass.position ? bearingDegrees(compass.position, destination) : null;
   const rotation = bearing != null && compass.heading != null ? relativeHeading(bearing, compass.heading) : 0;
@@ -21,7 +25,7 @@ export function CompassPanel({ destination }: { destination: Coordinate }) {
           <View style={[styles.rose, { transform: [{ rotate: `${-(compass.heading ?? 0)}deg` }], opacity: compass.heading == null ? 0.25 : 1 }]}><Text style={[styles.cardinal, styles.north]}>N</Text><Text style={[styles.cardinal, styles.east]}>E</Text><Text style={[styles.cardinal, styles.south]}>S</Text><Text style={[styles.cardinal, styles.west]}>O</Text></View>
           <View style={{ transform: [{ rotate: `${rotation}deg` }], opacity: compass.heading == null ? 0.25 : 1 }}><Ionicons name="arrow-up" size={62} color={colors.green} /></View>
         </View>
-        <View style={styles.distance}><Text style={type.title}>{distance != null ? formatDistance(distance) : '—'}</Text><Text style={type.small}>{distance != null && distance <= Math.max(20, compass.position.accuracy) ? 'Estás cerca del punto' : 'Hasta el lugar'}</Text><Text style={type.small}>GPS ±{Math.round(compass.position.accuracy)} m</Text></View>
+        <View style={styles.distance}><Text style={type.title}>{distance != null ? formatDistance(distance) : '—'}</Text><Text style={type.small}>{distance != null && distance <= ARRIVAL_RADIUS_M ? 'Llegaste al lugar' : 'Hasta el lugar'}</Text><Text style={type.small}>GPS ±{Math.round(compass.position.accuracy)} m</Text></View>
       </View>
       <Text style={type.small}>{compass.heading == null ? 'Esperando el magnetómetro…' : 'Mantén el teléfono plano. La flecha señala el destino.'}</Text>
     </>}

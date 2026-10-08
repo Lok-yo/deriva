@@ -265,6 +265,8 @@ select pg_temp.must_fail($sql$select public.deriva_create_place('20000000-0000-4
   '10000000-0000-4000-8000-000000000003/20000000-0000-4000-8000-000000000002.jpg','gallery')$sql$,
   '42501', 'legacy active Premium no longer authorizes arbitrary locations');
 reset role;
+insert into public.deriva_place_visits (user_id, place_key, distance_meters)
+select '10000000-0000-4000-8000-000000000003', key, 0 from unnest(array['demo-1','demo-2','demo-3']) key;
 select pg_temp.set_claims(null, 'service_role');
 set local role service_role;
 select public.deriva_record_remote_purchase('10000000-0000-4000-8000-000000000003','cs_test_legacy_rules','pi_legacy_rules',100,'usd');

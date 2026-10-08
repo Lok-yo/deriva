@@ -30,46 +30,47 @@ test('distancia para lectores en español', () => {
   assert.equal(formatDistance(1200), '1.2 km');
 });
 test('publicación gratuita válida y título normalizado', () => {
-  assert.equal(validatePublication({ ...draft, title: '  Un lugar  ' }, { isAdmin: false, remoteCredits: 0 }, gps).title, 'Un lugar');
+  assert.equal(validatePublication({ ...draft, title: '  Un lugar  ' }, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, gps).title, 'Un lugar');
 });
 test('el plan gratuito rechaza galería, biometría ausente y coordenadas remotas', () => {
-  assert.throws(() => validatePublication({ ...draft, photo: { ...draft.photo, source: 'gallery' } }, { isAdmin: false, remoteCredits: 0 }, gps), /cámara/i);
-  assert.throws(() => validatePublication({ ...draft, photo: { ...draft.photo, biometricVerified: false } }, { isAdmin: false, remoteCredits: 0 }, gps), /biometr/i);
-  assert.throws(() => validatePublication({ ...draft, latitude: 40 }, { isAdmin: false, remoteCredits: 0 }, gps), /ubicación/i);
+  assert.throws(() => validatePublication({ ...draft, photo: { ...draft.photo, source: 'gallery' } }, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, gps), /cámara/i);
+  assert.throws(() => validatePublication({ ...draft, photo: { ...draft.photo, biometricVerified: false } }, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, gps), /biometr/i);
+  assert.throws(() => validatePublication({ ...draft, latitude: 40 }, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, gps), /ubicación/i);
 });
 test('el plan gratuito rechaza GPS antiguo, impreciso y simulado', () => {
-  assert.throws(() => validatePublication(draft, { isAdmin: false, remoteCredits: 0 }, { ...gps, timestamp: new Date(Date.now() - 180000).toISOString() }), /GPS/i);
-  assert.throws(() => validatePublication(draft, { isAdmin: false, remoteCredits: 0 }, { ...gps, accuracy: 500 }), /precisión/i);
-  assert.throws(() => validatePublication(draft, { isAdmin: false, remoteCredits: 0 }, { ...gps, mocked: true }), /simulada/i);
+  assert.throws(() => validatePublication(draft, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, { ...gps, timestamp: new Date(Date.now() - 180000).toISOString() }), /GPS/i);
+  assert.throws(() => validatePublication(draft, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, { ...gps, accuracy: 500 }), /precisión/i);
+  assert.throws(() => validatePublication(draft, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, { ...gps, mocked: true }), /simulada/i);
 });
 test('Administrador permite galería y punto remoto, pero cámara sigue exigiendo biometría', () => {
-  assert.equal(validatePublication({ ...draft, mode: 'remote', latitude: 40, photo: { ...draft.photo, source: 'gallery', biometricVerified: false } }, { isAdmin: true, remoteCredits: 0 }, null).latitude, 40);
-  assert.throws(() => validatePublication({ ...draft, photo: { ...draft.photo, biometricVerified: false } }, { isAdmin: true, remoteCredits: 0 }, null), /biometr/i);
+  assert.equal(validatePublication({ ...draft, mode: 'remote', latitude: 40, photo: { ...draft.photo, source: 'gallery', biometricVerified: false } }, { isAdmin: true, remoteCredits: 0, visits: 0, requiredVisits: 3 }, null).latitude, 40);
+  assert.throws(() => validatePublication({ ...draft, photo: { ...draft.photo, biometricVerified: false } }, { isAdmin: true, remoteCredits: 0, visits: 0, requiredVisits: 3 }, null), /biometr/i);
 });
 test('rechaza títulos inválidos, modos desconocidos y coordenadas no finitas', () => {
-  for (const title of ['', 'ab', 'x'.repeat(81)]) assert.throws(() => validatePublication({ ...draft, title }, { isAdmin: true, remoteCredits: 0 }, null), /título/i);
-  for (const latitude of [NaN, Infinity, 91]) assert.throws(() => validatePublication({ ...draft, latitude }, { isAdmin: true, remoteCredits: 0 }, null), /coordenadas/i);
-  assert.throws(() => validatePublication({ ...draft, mode: 'bad' as never }, { isAdmin: true, remoteCredits: 0 }, null), /cómo publicar/i);
+  for (const title of ['', 'ab', 'x'.repeat(81)]) assert.throws(() => validatePublication({ ...draft, title }, { isAdmin: true, remoteCredits: 0, visits: 0, requiredVisits: 3 }, null), /título/i);
+  for (const latitude of [NaN, Infinity, 91]) assert.throws(() => validatePublication({ ...draft, latitude }, { isAdmin: true, remoteCredits: 0, visits: 0, requiredVisits: 3 }, null), /coordenadas/i);
+  assert.throws(() => validatePublication({ ...draft, mode: 'bad' as never }, { isAdmin: true, remoteCredits: 0, visits: 0, requiredVisits: 3 }, null), /cómo publicar/i);
 });
 
 test('remoto consume acceso por punto y local nunca hereda privilegios de admin', () => {
   const remote = { ...draft, mode: 'remote' as const, latitude: 40, photo: { ...draft.photo, source: 'gallery' as const, biometricVerified: false } };
-  assert.throws(() => validatePublication(remote, { isAdmin: false, remoteCredits: 0 }, null), /1 USD/);
-  assert.equal(validatePublication(remote, { isAdmin: false, remoteCredits: 1 }, null).latitude, 40);
-  assert.throws(() => validatePublication({ ...remote, mode: 'local' }, { isAdmin: true, remoteCredits: 0 }, gps), /cámara/i);
+  assert.throws(() => validatePublication(remote, { isAdmin: false, remoteCredits: 1, visits: 2, requiredVisits: 3 }, null), /Visita 3 lugares.*Llevas 2\/3/);
+  assert.throws(() => validatePublication(remote, { isAdmin: false, remoteCredits: 0, visits: 3, requiredVisits: 3 }, null), /1 USD/);
+  assert.equal(validatePublication(remote, { isAdmin: false, remoteCredits: 1, visits: 3, requiredVisits: 3 }, null).latitude, 40);
+  assert.throws(() => validatePublication({ ...remote, mode: 'local' }, { isAdmin: true, remoteCredits: 0, visits: 0, requiredVisits: 3 }, gps), /cámara/i);
 });
 test('publicación local toma GPS fresco aunque fallara ubicación anterior', () => {
   const input = { requestId: draft.requestId, title: draft.title, photo: draft.photo, mode: 'local' as const };
   const resolved = resolvePublicationDraft(input, gps);
   assert.deepEqual({ latitude: resolved.latitude, longitude: resolved.longitude }, origin);
-  assert.equal(validatePublication(resolved, { isAdmin: false, remoteCredits: 0 }, gps).title, draft.title);
+  assert.equal(validatePublication(resolved, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, gps).title, draft.title);
   assert.throws(() => resolvePublicationDraft(input, null), /GPS/);
   assert.equal(resolvePublicationDraft({ ...draft, latitude: 40 }, gps).latitude, gps.latitude);
 });
 test('parámetros remotos conservan coordenadas sin conferir acceso', () => {
   assert.deepEqual(publicationTarget({ mode: 'remote', latitude: '32.46', longitude: '-114.77' }), { mode: 'remote', coordinate: { latitude: 32.46, longitude: -114.77 } });
   for (const latitude of ['', 'NaN', '91', ['32.46']]) assert.equal(publicationTarget({ mode: 'remote', latitude, longitude: '-114.77' }).coordinate, null);
-  assert.deepEqual(publicationAccess({ is_admin: 'true', remote_credits: '1' }), { isAdmin: false, remoteCredits: 0 });
-  assert.deepEqual(publicationAccess({ is_admin: true, remote_credits: 2 }), { isAdmin: true, remoteCredits: 2 });
-  assert.deepEqual(publicationAccess(null), { isAdmin: false, remoteCredits: 0 });
+  assert.deepEqual(publicationAccess({ is_admin: 'true', remote_credits: '1', visits: '4', required_visits: 0 }), { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 });
+  assert.deepEqual(publicationAccess({ is_admin: true, remote_credits: 2, visits: 5, required_visits: 3 }), { isAdmin: true, remoteCredits: 2, visits: 5, requiredVisits: 3 });
+  assert.deepEqual(publicationAccess(null), { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 });
 });

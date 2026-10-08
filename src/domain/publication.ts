@@ -1,3 +1,4 @@
+import { REQUIRED_VISITS, remoteUnlocked } from './exploration';
 import { distanceMeters, isCoordinate } from './geo';
 import type { Coordinate, Position, PublicationAccess, PublicationInput, PublishDraft } from './models';
 
@@ -16,6 +17,7 @@ export function validatePublication(draft: PublishDraft, access: PublicationAcce
   if (!isCoordinate(draft)) throw new Error('Las coordenadas no son válidas.');
   if (!['local', 'remote'].includes(draft.mode)) throw new Error('Elige cómo publicar el lugar.');
   if (!draft.photo?.uri || !['camera', 'gallery'].includes(draft.photo.source)) throw new Error('Agrega una foto del lugar.');
+  if (draft.mode === 'remote' && !remoteUnlocked(access)) throw new Error(`Visita ${access.requiredVisits} lugares para desbloquear las ubicaciones en cualquier punto. Llevas ${access.visits}/${access.requiredVisits}.`);
   if (draft.mode === 'remote' && !access.isAdmin && access.remoteCredits < 1) throw new Error('Para agregar una ubicación en otro lugar, paga 1 USD.');
   if (draft.mode === 'local' && draft.photo.source !== 'camera') throw new Error('Publicar gratis desde aquí requiere una foto de la cámara.');
   if (draft.photo.source === 'camera' && !draft.photo.biometricVerified) throw new Error('Confirma tu identidad con biometría antes de tomar la foto.');
@@ -32,7 +34,8 @@ export function validatePublication(draft: PublishDraft, access: PublicationAcce
 
 export function publicationAccess(value: unknown): PublicationAccess {
   const data = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  return { isAdmin: data.is_admin === true, remoteCredits: typeof data.remote_credits === 'number' && Number.isSafeInteger(data.remote_credits) && data.remote_credits > 0 ? data.remote_credits : 0 };
+  const count = (raw: unknown) => typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0 ? raw : 0;
+  return { isAdmin: data.is_admin === true, remoteCredits: count(data.remote_credits), visits: count(data.visits), requiredVisits: count(data.required_visits) || REQUIRED_VISITS };
 }
 
 export function publicationTarget(params: { mode?: string | string[]; latitude?: string | string[]; longitude?: string | string[] }): { mode: PublishDraft['mode']; coordinate: Coordinate | null } {

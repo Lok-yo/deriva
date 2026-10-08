@@ -18,7 +18,7 @@ export async function readMapLocation(): Promise<MapLocationResult> {
     ]);
     const { latitude, longitude, accuracy } = result.coords;
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) throw new Error('Invalid coordinate');
-    return { position: { latitude, longitude, accuracy: accuracy != null && Number.isFinite(accuracy) ? accuracy : null, timestamp: new Date(result.timestamp).toISOString() } };
+    return { position: { latitude, longitude, accuracy: accuracy != null && Number.isFinite(accuracy) ? accuracy : null, timestamp: new Date(result.timestamp).toISOString(), mocked: result.mocked ?? false } };
   } catch {
     return { status: 'error', canAskAgain: true, error: 'No encontramos tu ubicación. Acércate a una ventana o vuelve a intentar.' };
   } finally { if (timeout) clearTimeout(timeout); }

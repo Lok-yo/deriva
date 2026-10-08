@@ -53,13 +53,17 @@ cross join (values ('22000000-0000-4000-8000-000000000001'::uuid), ('22000000-00
   ('22000000-0000-4000-8000-000000000003'::uuid), ('22000000-0000-4000-8000-000000000004'::uuid),
   ('22000000-0000-4000-8000-000000000005'::uuid), ('22000000-0000-4000-8000-000000000006'::uuid)) p(pid);
 
+-- Remote publication also requires exploring; this suite covers payments only.
+insert into public.deriva_place_visits (user_id, place_key, distance_meters)
+select '11000000-0000-4000-8000-000000000001', key, 0 from unnest(array['demo-1','demo-2','demo-3']) key;
+
 -- Legacy verified Premium deliberately exists, but grants no new entitlement.
 insert into public.deriva_entitlements(user_id, active, expires_at, verified_at)
 values ('11000000-0000-4000-8000-000000000001',true,now()+interval '1 year',now());
 
 select pg_temp.set_claims('11000000-0000-4000-8000-000000000001','authenticated');
 set local role authenticated;
-select pg_temp.assert_true(public.deriva_get_access() = '{"is_admin":false,"remote_credits":0}'::jsonb,
+select pg_temp.assert_true(public.deriva_get_access() @> '{"is_admin":false,"remote_credits":0}'::jsonb,
   'user metadata and legacy Premium do not confer access');
 select pg_temp.must_fail($q$select public.deriva_create_place_v2('22000000-0000-4000-8000-000000000001','Lugar remoto','remote',32.44,-114.78,
   '11000000-0000-4000-8000-000000000001/22000000-0000-4000-8000-000000000001.jpg','gallery')$q$, '42501', 'unpaid remote publication blocked');
@@ -136,7 +140,7 @@ select pg_temp.must_fail($q$select public.deriva_record_remote_purchase('1100000
 reset role;
 select pg_temp.set_claims('11000000-0000-4000-8000-000000000001','authenticated');
 set local role authenticated;
-select pg_temp.assert_true(public.deriva_get_access() = '{"is_admin":false,"remote_credits":1}'::jsonb, 'one confirmed payment grants one credit');
+select pg_temp.assert_true(public.deriva_get_access() @> '{"is_admin":false,"remote_credits":1}'::jsonb, 'one confirmed payment grants one credit');
 select pg_temp.must_fail($q$select public.deriva_create_place('22000000-0000-4000-8000-000000000002','Versión antigua','misterio',29.07,-110.96,
   '11000000-0000-4000-8000-000000000001/22000000-0000-4000-8000-000000000002.jpg','gallery')$q$, '42501', 'v1 never spends a credit silently');
 select pg_temp.must_fail($q$select public.deriva_create_place_v2('22000000-0000-4000-8000-000000000099','Falta fotografía','remote',29.07,-110.96,
@@ -169,7 +173,7 @@ select public.deriva_record_remote_purchase('11000000-0000-4000-8000-00000000000
 reset role;
 select pg_temp.set_claims('11000000-0000-4000-8000-000000000002','authenticated');
 set local role authenticated;
-select pg_temp.assert_true(public.deriva_get_access() = '{"is_admin":true,"remote_credits":1}'::jsonb, 'server grants app admin role');
+select pg_temp.assert_true(public.deriva_get_access() @> '{"is_admin":true,"remote_credits":1}'::jsonb, 'server grants app admin role');
 select pg_temp.assert_true(public.deriva_create_place_v2('22000000-0000-4000-8000-000000000003','Lugar admin','remote',19.43,-99.13,
   '11000000-0000-4000-8000-000000000002/22000000-0000-4000-8000-000000000003.jpg','gallery')
   = '22000000-0000-4000-8000-000000000003'::uuid, 'admin publishes remote without GPS or payment');
@@ -188,7 +192,7 @@ select public.deriva_refund_remote_purchase('pi_admincredit',100,'usd');
 reset role;
 select pg_temp.set_claims('11000000-0000-4000-8000-000000000002','authenticated');
 set local role authenticated;
-select pg_temp.assert_true(public.deriva_get_access() = '{"is_admin":false,"remote_credits":0}'::jsonb, 'role revocation takes effect without a new JWT');
+select pg_temp.assert_true(public.deriva_get_access() @> '{"is_admin":false,"remote_credits":0}'::jsonb, 'role revocation takes effect without a new JWT');
 select pg_temp.must_fail($q$select public.deriva_create_place_v2('22000000-0000-4000-8000-000000000004','Admin revocado','remote',19.43,-99.13,
   '11000000-0000-4000-8000-000000000002/22000000-0000-4000-8000-000000000004.jpg','gallery')$q$,
   '42501', 'revoked admin cannot publish another remote point');
@@ -233,7 +237,7 @@ select pg_temp.set_claims('11000000-0000-4000-8000-000000000003','authenticated'
 set local role authenticated;
 select pg_temp.assert_true((select count(*)=0 from public.deriva_remote_purchases), 'purchase rows private to owner');
 select pg_temp.assert_true((select count(*)=0 from public.deriva_roles), 'role rows private to owner');
-select pg_temp.assert_true(public.deriva_get_access() = '{"is_admin":false,"remote_credits":0}'::jsonb, 'access cannot target another user');
+select pg_temp.assert_true(public.deriva_get_access() @> '{"is_admin":false,"remote_credits":0}'::jsonb, 'access cannot target another user');
 
 reset role;
 select pg_temp.set_claims(null,'anon');

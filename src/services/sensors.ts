@@ -21,6 +21,16 @@ export async function getCurrentPosition(): Promise<Position> {
   } finally { if (timeout) clearTimeout(timeout); }
 }
 
+/** Foreground-only updates while walking. Readings are passed through; callers decide if they are precise enough. */
+export async function watchPosition(onPosition: (position: Position) => void): Promise<() => void> {
+  const subscription = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, distanceInterval: 5, timeInterval: 4000 }, result => {
+    const { latitude, longitude, accuracy } = result.coords;
+    if (accuracy == null || !Number.isFinite(accuracy) || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    onPosition({ latitude, longitude, accuracy, timestamp: new Date(result.timestamp).toISOString(), mocked: result.mocked ?? false });
+  });
+  return () => subscription.remove();
+}
+
 export async function subscribeCompass(onHeading: (degrees: number) => void): Promise<() => void> {
   if (Platform.OS === 'web') throw new Error('La brújula está disponible en la app Android o iOS. Abre Deriva en tu teléfono.');
   if (!await Magnetometer.isAvailableAsync()) throw new Error('Este teléfono no tiene un magnetómetro disponible.');

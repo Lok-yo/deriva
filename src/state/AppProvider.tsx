@@ -1,7 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState as NativeAppState } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
-import type { AppNotification, ConnectionState, Place, Profile, PublicationAccess } from '../domain/models';
+import type { AppNotification, ConnectionState, Place, PlaceVisit, Profile, PublicationAccess } from '../domain/models';
+import { REQUIRED_VISITS, remoteUnlocked, visitResult } from '../domain/exploration';
 import type { AppState } from './contracts';
 import { isPreviewPlace, previewPlaces } from '../data/preview';
 import { useMapLocation } from './useMapLocation';
@@ -13,11 +14,14 @@ import { canRegisterPush, registerPushToken, unregisterPushToken } from '../serv
 import { openRemoteCheckout } from '../services/checkout';
 
 const Context = createContext<AppState | null>(null);
+const noAccess: PublicationAccess = { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: REQUIRED_VISITS };
 export function useApp(): AppState {
   const context = useContext(Context);
   if (!context) throw new Error('AppProvider no está disponible.');
   return context;
 }
+
+const noVisits: PlaceVisit[] = [];
 
 export function AppProvider({ children }: React.PropsWithChildren) {
   const navigationLocation = useMapLocation();
@@ -29,7 +33,8 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   const [places, setPlaces] = useState<Place[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [access, setAccess] = useState<PublicationAccess>({ isAdmin: false, remoteCredits: 0 });
+  const [visits, setVisits] = useState<PlaceVisit[]>([]);
+  const [access, setAccess] = useState<PublicationAccess>(noAccess);
   const [connection, setConnection] = useState<ConnectionState>('preview');
   const [error, setError] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -43,8 +48,8 @@ export function AppProvider({ children }: React.PropsWithChildren) {
   const acceptSession = useCallback((nextSession: Session | null) => {
     if (sessionRef.current?.user.id !== nextSession?.user.id) {
       sequence.current += 1;
-      setLoadedUser(null); setProfile(null); setPlaces([]); setSavedIds([]); setNotifications([]);
-      setAccess({ isAdmin: false, remoteCredits: 0 }); setError(null); setNotificationsEnabled(false);
+      setLoadedUser(null); setProfile(null); setPlaces([]); setSavedIds([]); setNotifications([]); setVisits([]);
+      setAccess(noAccess); setError(null); setNotificationsEnabled(false);
       realtimeConnected.current = false; dataHealthy.current = false;
       setConnection(nextSession ? 'connecting' : 'preview');
     }
@@ -72,19 +77,20 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     if (!user || !supabase) return;
     const current = ++sequence.current;
     try {
-      const [nextProfile, saved, inbox, preference, access] = await Promise.all([
+      const [nextProfile, saved, inbox, preference, access, visited] = await Promise.all([
         ensureProfile(user.id, String(user.user_metadata.full_name ?? 'Explorador')),
         supabase.from('deriva_saved_places').select('place_id').eq('user_id', user.id),
         supabase.from('deriva_notifications').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
         supabase.from('deriva_notification_preferences').select('*').eq('user_id', user.id).maybeSingle(),
         supabase.rpc('deriva_get_access'),
+        supabase.from('deriva_place_visits').select('place_key, visited_at').eq('user_id', user.id).order('visited_at', { ascending: false }),
       ]);
-      for (const result of [saved, inbox, preference, access]) if (result.error) throw result.error;
+      for (const result of [saved, inbox, preference, access, visited]) if (result.error) throw result.error;
       const nextIds = (saved.data ?? []).map(item => String(item.place_id));
       const nextNotifications = (inbox.data ?? []) as AppNotification[];
       const nextPlaces = await fetchPlaces([...nextIds, ...nextNotifications.flatMap(item => item.place_id ? [item.place_id] : [])]);
       if (current !== sequence.current || user.id !== sessionRef.current?.user.id) return;
-      setProfile(nextProfile); setPlaces(nextPlaces); setSavedIds(nextIds); setNotifications(nextNotifications);
+      setProfile(nextProfile); setPlaces(nextPlaces); setSavedIds(nextIds); setNotifications(nextNotifications); setVisits((visited.data ?? []) as PlaceVisit[]);
       setAccess(publicationAccess(access.data)); setNotificationsEnabled(preference.data?.enabled === true); setNotificationRadius(preference.data?.radius_km ?? 10);
       setLoadedUser(user.id); setError(null); dataHealthy.current = true;
       setConnection(realtimeConnected.current ? 'live' : 'connecting');
@@ -108,6 +114,7 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_saved_places', filter: `user_id=eq.${userId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notifications', filter: `user_id=eq.${userId}` }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_notification_preferences', filter: `user_id=eq.${userId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deriva_place_visits', filter: `user_id=eq.${userId}` }, scheduleRefresh)
       .subscribe(status => {
         if (sessionRef.current?.user.id !== userId) return;
         realtimeConnected.current = status === 'SUBSCRIBED';
@@ -152,6 +159,9 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     return user;
   };
   const belongsToSession = !!session && loadedUser === session.user.id;
+  const ownVisits = belongsToSession ? visits : noVisits;
+  const visitedIds = useMemo(() => new Set(ownVisits.map(visit => visit.place_key)), [ownVisits]);
+  const currentAccess = belongsToSession ? access : noAccess;
   const handle = async <T,>(operation: () => Promise<T>): Promise<T> => {
     try { return await operation(); } catch (cause) { throw friendlyError(cause); }
   };
@@ -159,9 +169,10 @@ export function AppProvider({ children }: React.PropsWithChildren) {
     ready, session, profile: belongsToSession ? profile : null, isPreview: !session,
     places: belongsToSession ? [...previewPlaces, ...places] : previewPlaces,
     savedIds: belongsToSession ? savedIds : [], notifications: belongsToSession ? notifications : [],
-    isAdmin: belongsToSession && access.isAdmin, remoteCredits: belongsToSession ? access.remoteCredits : 0, connection: session ? connection : 'preview', error,
+    isAdmin: currentAccess.isAdmin, remoteCredits: currentAccess.remoteCredits, connection: session ? connection : 'preview', error,
+    visits: ownVisits, visitedIds, visitCount: currentAccess.visits, requiredVisits: currentAccess.requiredVisits, remoteUnlocked: remoteUnlocked(currentAccess),
     notificationsEnabled: belongsToSession && (notificationsEnabled || access.isAdmin), notificationRadius, refresh,
-    mapLocation: navigationLocation.location, startMapLocation: navigationLocation.start, locateMap: navigationLocation.locate,
+    mapLocation: navigationLocation.location, startMapLocation: navigationLocation.start, locateMap: navigationLocation.locate, followMapLocation: navigationLocation.follow,
     signIn: (email, password) => handle(async () => {
       const result = await requireSupabase().auth.signInWithPassword({ email: email.trim(), password });
       if (result.error) throw result.error;
@@ -216,6 +227,21 @@ export function AppProvider({ children }: React.PropsWithChildren) {
       if (removed.error) throw removed.error;
       await client.storage.from('deriva-photos').remove([removed.data.photo_path]);
       await refresh();
+    }),
+    recordVisit: (placeId, reading) => handle(async () => {
+      const user = currentUser();
+      const result = await requireSupabase().rpc('deriva_record_visit', {
+        p_place_key: placeId, p_gps_latitude: reading.latitude, p_gps_longitude: reading.longitude,
+        p_gps_accuracy: reading.accuracy, p_gps_timestamp: reading.timestamp,
+      });
+      if (result.error) throw result.error;
+      const outcome = visitResult(result.data);
+      if (sessionRef.current?.user.id === user.id) {
+        setAccess(current => ({ ...current, visits: outcome.visits, requiredVisits: outcome.requiredVisits }));
+        if (outcome.recorded) setVisits(current => current.some(visit => visit.place_key === placeId) ? current : [{ place_key: placeId, visited_at: new Date().toISOString() }, ...current]);
+      }
+      void refresh();
+      return outcome;
     }),
     markNotificationRead: id => handle(async () => {
       const user = currentUser();

@@ -77,6 +77,9 @@ Deno.serve(async (request: Request) => {
       if (ticket.error.message.includes("remote_access_available")) {
         throw new HttpError(409, "remote_access_available", "Ya puedes publicar sin otro pago. Vuelve a Deriva.");
       }
+      if (ticket.error.message.includes("exploration_required")) {
+        throw new HttpError(403, "exploration_required", "Visita 3 lugares antes de pagar una ubicación en cualquier punto.");
+      }
       if (ticket.error.message.includes("Checkout request expired")) {
         throw new HttpError(400, "checkout_request_expired", "El enlace anterior venció. Inicia el pago de nuevo.");
       }

@@ -25,7 +25,9 @@ export function usePublicationForm() {
   const working = useRef(false);
   const active = useRef(true);
   const isRemote = mode === 'remote';
-  const needsPayment = isRemote && !app.isAdmin && app.remoteCredits < 1;
+  const locked = isRemote && !!app.session && !app.remoteUnlocked;
+  const needsPayment = isRemote && !locked && !app.isAdmin && app.remoteCredits < 1;
+  const lockedMessage = `Visita ${app.requiredVisits} lugares para desbloquear las ubicaciones en cualquier punto. Llevas ${app.visitCount}/${app.requiredVisits}.`;
 
   useEffect(() => {
     active.current = true;
@@ -75,6 +77,7 @@ export function usePublicationForm() {
   }
   async function checkout() {
     if (!app.session) { signIn(); return; }
+    if (locked) { setError(lockedMessage); return; }
     if (!coordinate) { setError('Elige un punto en el mapa antes de pagar.'); return; }
     await run('checkout', async () => {
       checkoutRequest.current ??= Crypto.randomUUID();
@@ -90,6 +93,7 @@ export function usePublicationForm() {
     if (title.trim().length < 3 || title.trim().length > 80) { setError('Escribe un título de entre 3 y 80 caracteres.'); return; }
     if (!photo) { setError('Añade una fotografía antes de publicar.'); return; }
     if (isRemote && !coordinate) { setError('Elige un punto en el mapa para publicar.'); return; }
+    if (locked) { setError(lockedMessage); return; }
     if (needsPayment) { setError('Para agregar esta ubicación, paga 1 USD.'); return; }
     await run('publish', async () => {
       requestId.current ??= Crypto.randomUUID();
@@ -103,5 +107,5 @@ export function usePublicationForm() {
     });
   }
   function useLocalMode() { if (!working.current) { setPhoto(null); router.setParams({ mode: 'local', latitude: '', longitude: '' }); } }
-  return { title, setTitle, photo, position, coordinate, setCoordinate, mode, isRemote, needsPayment, checkoutStarted, busy, error, locate, camera, gallery, publish, checkout, refreshPayment, signIn, useLocalMode };
+  return { title, setTitle, photo, position, coordinate, setCoordinate, mode, isRemote, locked, needsPayment, checkoutStarted, busy, error, locate, camera, gallery, publish, checkout, refreshPayment, signIn, useLocalMode };
 }

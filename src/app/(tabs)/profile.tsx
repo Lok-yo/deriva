@@ -49,6 +49,7 @@ export default function Profile() {
     </View>}
     <View style={styles.menu}>
       <MenuRow title="Actividad" detail={unread ? `${unread} sin leer` : undefined} icon="notifications-outline" onPress={() => router.push('/activity')} />
+      <MenuRow title="Exploración" detail={!app.session ? undefined : app.remoteUnlocked ? 'Desbloqueado' : `${app.visitCount}/${app.requiredVisits}`} icon="footsteps-outline" onPress={() => router.push('/exploration')} />
     </View>
     {app.session && <>
       <View style={styles.menu}>

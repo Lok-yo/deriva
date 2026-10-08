@@ -13,6 +13,9 @@ select pg_temp.expect_error($q$select public.deriva_configure_payment_link('plin
 insert into auth.users(id,aud,role,email,raw_user_meta_data,is_anonymous) values
  ('76a814f7-3ebd-43fa-9baa-1ca759ae76dc','authenticated','authenticated','deriva-ticket-fixture@example.invalid','{"full_name":"Ticket Fixture"}',false),
  ('725d9620-812b-4517-9fe1-2ab7d0b3b129','authenticated','authenticated','deriva-ticket-second@example.invalid','{"full_name":"Second Fixture"}',false);
+-- Paying for a remote point requires three verified visits first.
+insert into public.deriva_place_visits(user_id,place_key,distance_meters)
+select u,k,0 from unnest(array['76a814f7-3ebd-43fa-9baa-1ca759ae76dc','725d9620-812b-4517-9fe1-2ab7d0b3b129']::uuid[]) u cross join unnest(array['demo-1','demo-2','demo-3']) k;
 create temporary table fixture_tickets as select public.deriva_checkout_ticket('76a814f7-3ebd-43fa-9baa-1ca759ae76dc','dc874f15-350c-4779-bf17-3b71ad62a7dd') as ticket;
 select pg_temp.assert_true((select ticket from fixture_tickets)=public.deriva_checkout_ticket('76a814f7-3ebd-43fa-9baa-1ca759ae76dc','dc874f15-350c-4779-bf17-3b71ad62a7dd'),'retry stable ticket');
 select pg_temp.assert_true((select ticket->>'ticket_id' from fixture_tickets) <> public.deriva_checkout_ticket('725d9620-812b-4517-9fe1-2ab7d0b3b129','dc874f15-350c-4779-bf17-3b71ad62a7dd')->>'ticket_id','request bound to owner');

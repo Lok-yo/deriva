@@ -42,6 +42,24 @@ npx --yes supabase@2.119.0 functions deploy deriva-remote-checkout deriva-stripe
 
 `deriva_roles` y `deriva_remote_purchases` tienen RLS y lectura exclusiva del propietario. Los clientes no pueden escribir ni concederse privilegios. `deriva_get_access()` devuelve `is_admin` y `remote_credits`. `deriva_create_place_v2` crea el lugar y consume un solo crédito en la misma transacción. Reintentos, reembolsos y cambios de rol se serializan; los identificadores sobreviven a la eliminación del lugar.
 
+## Exploración: visitas verificadas
+
+La migración `20261008061830_deriva_exploration_visits.sql` hace que las ubicaciones remotas se ganen explorando. Una cuenta debe llegar en persona a **3 lugares** antes de poder pagar o publicar un punto remoto.
+
+- `public.deriva_place_visits` guarda una fila por cuenta y lugar (`place_key` es el UUID de `deriva_places` o `demo-1`…`demo-6`). Tiene RLS: cada cuenta solo lee sus visitas y ningún cliente puede escribirlas. No tiene clave foránea al lugar, para que una visita sobreviva aunque se borre la publicación. Está en Realtime.
+- `deriva_private.preview_places` replica las coordenadas de `src/data/preview.ts` para verificar visitas a los ejemplos, que no viven en `deriva_places`. La prueba `tests/exploration.test.ts` falla si se desincronizan.
+- `deriva_record_visit(place_key, latitud, longitud, precisión, timestamp)` exige sesión, GPS de 100 m de precisión o mejor, de menos de dos minutos, y una distancia de 100 m o menos (`deriva_private.arrival_radius_meters()`). Las publicaciones propias se rechazan. Es idempotente y devuelve `recorded`, `visits`, `required_visits`, `unlocked` y `just_unlocked`. La visita que completa el requisito agrega el aviso «Exploración completada» a Actividad.
+- `deriva_get_access()` ahora también devuelve `visits` y `required_visits`.
+- `deriva_create_place_v2` rechaza un punto remoto sin las visitas (42501) antes de consumir crédito, y `deriva_checkout_ticket` falla con `exploration_required`, así que no se puede pagar antes de explorar. Los administradores siguen exentos.
+
+`deriva-remote-checkout` traduce `exploration_required` a un 403 con mensaje en español. Después de aplicar la migración, vuelve a desplegarla:
+
+```bash
+npx --yes supabase@2.119.0 functions deploy deriva-remote-checkout --use-api --no-verify-jwt --project-ref TU_PROJECT_REF
+```
+
+Sin ese redeploy, el bloqueo sigue vigente en la base de datos, pero Checkout responde con un error genérico.
+
 Para asignar un administrador de Deriva, desde una conexión de servicio/administrador:
 
 ```sql
@@ -78,6 +96,8 @@ Ejecuta el archivo completo con una conexión de administrador configurada en `D
 ```bash
 psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_rules.sql
 psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_remote_publications.sql
+psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_payment_link_tickets.sql
+psql "$DERIVA_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/deriva_exploration.sql
 ```
 
 La suite inicia una transacción y termina en `ROLLBACK`; revierte fixtures, tokens, derechos, ajustes de Storage y cambios del worker/cron. No la ejecutes fragmentada. Comprueba reglas de publicación, aislamiento de cuentas, Storage, privilegios, reintentos y autenticación de cron, incluyendo replay y expiración.
@@ -85,5 +105,7 @@ La suite inicia una transacción y termina en `ROLLBACK`; revierte fixtures, tok
 Las tres suites pasaron en PostgreSQL alojado. Sus fixtures se revirtieron: el estado previo de dos usuarios, tres lugares y cero compras permaneció intacto, junto con el rol admin solicitado y la configuración real del Payment Link. Se comprobaron publicación local, admin, compra consumible, intentos de elevar privilegios, RLS, rollback, reintentos y reembolsos fuera de orden. La concurrencia está protegida con bloqueos transaccionales; estas suites no crean carreras físicas entre conexiones.
 
 Los dos endpoints Stripe pasaron Deno check y las pruebas unitarias de firma/pago. Los endpoints v3 rechazan Checkout sin sesión (401) y webhook sin firma (400); un evento sintético firmado e ignorable devolvió 200 sin conceder créditos. El retorno es informativo. Stripe y Vault están configurados para prueba. La transacción completa desde Expo Go y los sensores siguen pendientes de comprobar en un teléfono.
+
+`deriva_exploration.sql` comprueba llegadas válidas y rechazadas (lejos, GPS viejo o impreciso, lugar propio o inexistente), idempotencia, desbloqueo y su aviso único, bloqueo de pago y publicación remota antes de 3 visitas, que los clientes no pueden falsificar visitas, durabilidad tras borrar el lugar y la exención de admin. Las suites que publican puntos remotos crean tres visitas de ejemplo como fixture.
 
 El advisor reportó seis INFO por RLS sin políticas en tablas privadas/cola, deliberadamente inaccesibles a clientes, y un WARN preexistente de protección de contraseñas filtradas desactivada en Auth. [RLS sin políticas](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy), [protección de contraseñas](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection). No se cambiaron políticas ni la configuración de Auth que ya existían.

@@ -1,13 +1,15 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Text, View } from 'react-native';
+import { ARRIVAL_RADIUS_M } from '../../domain/exploration';
 import { useApp } from '../../state/AppProvider';
 import { Button } from '../../ui/Button';
+import { ExplorationMeter, unlockSummary } from '../../ui/Exploration';
 import { Notice } from '../../ui/Feedback';
 import { Field } from '../../ui/Forms';
 import { LocationPicker } from '../../ui/LocationPicker';
 import { Page, PageHeading } from '../../ui/Page';
 import { PhotoPicker } from '../../ui/PhotoPicker';
-import { type } from '../../ui/theme';
+import { layout, type } from '../../ui/theme';
 import { usePublicationForm } from '../../ui/usePublicationForm';
 
 export default function Publish() {
@@ -21,17 +23,26 @@ function PublicationForm() {
   const app = useApp();
   const form = usePublicationForm();
   return <Page keyboard>
-    <PageHeading title="Publicar lugar" body={form.isRemote ? app.isAdmin ? 'Elige una foto. Publicas gratis como administrador.' : 'Una foto, un título y el punto que elegiste.' : 'Una foto, un título y tu ubicación actual.'} />
+    <PageHeading title="Publicar lugar" body={form.locked ? 'Las ubicaciones en cualquier punto se ganan explorando.' : form.isRemote ? app.isAdmin ? 'Elige una foto. Publicas gratis como administrador.' : 'Una foto, un título y el punto que elegiste.' : 'Una foto, un título y tu ubicación actual.'} />
     {!app.session ? <View style={{ gap: 16 }}>
       <Text style={type.body}>Inicia sesión para compartir un lugar.</Text>
-      {form.isRemote && <Text style={type.small}>Conservaremos el punto que elegiste. Agregar una ubicación en otro lugar cuesta 1 USD.</Text>}
+      {form.isRemote && <Text style={type.small}>Conservaremos el punto que elegiste. Primero visita {app.requiredVisits} lugares; después, agregar una ubicación en otro lugar cuesta 1 USD.</Text>}
       <Button label="Crear cuenta o iniciar sesión" icon="person-outline" onPress={form.signIn} />
-    </View> : <>
+    </View> : form.locked ? <>
+      <View style={layout.card} testID="remote-locked">
+        <Text style={type.heading}>{app.visitCount}/{app.requiredVisits} lugares visitados</Text>
+        <ExplorationMeter visits={app.visitCount} required={app.requiredVisits} />
+        <Text style={type.small}>{unlockSummary(app)} Las visitas se registran al llegar a menos de {ARRIVAL_RADIUS_M} m de un ? de otra persona o de un ejemplo.</Text>
+        <Button label="Ver mi exploración" icon="footsteps-outline" variant="secondary" onPress={() => router.push('/exploration')} />
+      </View>
+      {form.error && <Notice tone="error">{form.error}</Notice>}
+      <Button label="Publicar gratis desde donde estoy" icon="locate-outline" onPress={form.useLocalMode} />
+    </> : <>
       <Field label="Título" placeholder="¿Cómo se llama este lugar?" value={form.title} onChangeText={form.setTitle} maxLength={80} editable={!form.busy} />
       <PhotoPicker photo={form.photo} allowGallery={form.isRemote} busy={form.busy} onCamera={() => void form.camera()} onGallery={() => void form.gallery()} />
       <LocationPicker coordinate={form.coordinate} position={form.position} remote={form.isRemote} busy={form.busy} onLocate={() => void form.locate()} onChange={form.setCoordinate} />
       {form.isRemote && <View style={{ gap: 12 }}>
-        <Text style={type.small}>{app.isAdmin ? 'Administrador · Este punto es gratis.' : app.remoteCredits > 0 ? 'Pago confirmado · Este punto ya está cubierto.' : 'Para agregar una ubicación nueva en este punto debes pagar 1 USD.'}</Text>
+        <Text style={type.small}>{app.isAdmin ? 'Administrador · Este punto es gratis.' : app.remoteCredits > 0 ? 'Pago confirmado · Este punto ya está cubierto.' : 'Exploración completada · Para agregar una ubicación nueva en este punto debes pagar 1 USD.'}</Text>
         {form.needsPayment && <>
           <Button label={form.checkoutStarted ? 'Volver al pago de prueba · 1 USD' : 'Pagar 1 USD · Prueba'} icon="card-outline" onPress={() => void form.checkout()} loading={form.busy === 'checkout'} disabled={!!form.busy} />
           <Text style={type.small}>Stripe en modo de prueba. No se cobran importes reales.</Text>

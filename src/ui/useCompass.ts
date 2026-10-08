@@ -2,7 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import type { Position } from '../domain/models';
-import { getCurrentPosition, subscribeCompass } from '../services/sensors';
+import { getCurrentPosition, subscribeCompass, watchPosition } from '../services/sensors';
 import { errorMessage } from './Feedback';
 
 export function useCompass() {
@@ -11,10 +11,10 @@ export function useCompass() {
   const [active, setActive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const stop = useRef<(() => void) | null>(null);
+  const stop = useRef<(() => void)[]>([]);
   const generation = useRef(0);
   const deactivate = useCallback(() => {
-    generation.current += 1; stop.current?.(); stop.current = null;
+    generation.current += 1; stop.current.forEach(remove => remove()); stop.current = [];
     setActive(false); setHeading(null); setBusy(false);
   }, []);
   useFocusEffect(useCallback(() => {
@@ -32,7 +32,11 @@ export function useCompass() {
       setPosition(location);
       const unsubscribe = await subscribeCompass(value => { if (attempt === generation.current) setHeading(value); });
       if (attempt !== generation.current) { unsubscribe(); return; }
-      stop.current = unsubscribe; setActive(true);
+      stop.current.push(unsubscribe); setActive(true);
+      // Live distance is a bonus: the first reading already works if the watch cannot start.
+      const unwatch = await watchPosition(next => { if (attempt === generation.current) setPosition(next); }).catch(() => null);
+      if (unwatch && attempt !== generation.current) unwatch();
+      else if (unwatch) stop.current.push(unwatch);
     } catch (e) { if (attempt === generation.current) setError(errorMessage(e)); }
     finally { if (attempt === generation.current) setBusy(false); }
   }

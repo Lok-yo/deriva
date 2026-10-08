@@ -25,6 +25,8 @@ Verificación del 4 de octubre de 2026:
 
 Después de integrar Exploración, `npm run check` pasó el 7 de octubre de 2026: TypeScript, ESLint y 101/101 pruebas. No se repitieron las exportaciones de paquetes ni se comprobó esta función en un teléfono.
 
+Con las visitas verificadas, `npm run check` pasó el 8 de octubre de 2026 (106/106 pruebas). La migración `20261008061830_deriva_exploration_visits.sql` se aplicó en el proyecto alojado; `deriva_exploration.sql` pasó antes de aplicarla y `deriva_remote_publications.sql` y `deriva_payment_link_tickets.sql` después. La llegada física sigue pendiente de probar en un teléfono.
+
 Evidencia local en `verification/dark-export`, `verification/dark-web`, `verification/publication-fixtures` y `verification/stripe-runtime-report.json`. `scripts/verify_publication.py` intercepta todas las solicitudes Supabase y WebSockets para probar la interfaz sin escribir datos reales ni simular una prueba de sensores físicos. Las tres suites SQL terminan en `ROLLBACK` y no usan pagos reales. La prueba sintética del webhook comprueba firma y recepción sin registrar créditos; no equivale a completar un pago con tarjeta. La verificación no inicia ni detiene el servidor de desarrollo.
 
 Las comprobaciones anteriores al cambio de modelo pasaron TypeScript, ESLint, 65 pruebas y paquetes Android/iOS/web. Se había verificado Storage, RLS, Auth, Realtime y el worker de push. Esos resultados son historial; las suscripciones Premium anteriores ya no autorizan publicaciones remotas.
@@ -38,7 +40,10 @@ Registrar modelo, sistema y versión de Expo Go junto con cada resultado.
 - [ ] Ver cartografía oscura y pins `?`; no confundir el fondo oscuro con teselas que no cargan. Probar gestos y recarga tras perder internet.
 - [ ] Navegar entre las tres pestañas sin desplazamiento lateral. Perfil no muestra Guardados ni Premium.
 - [ ] Abrir un punto: título y foto, con Activar GPS y brújula arriba; sin categorías, descripciones de muestra ni enlaces de navegación externa.
-- [ ] En Explorar, comprobar que los lugares se ordenan por cercanía; abrir una ficha marca ese lugar como descubierto y actualiza el contador local.
+- [ ] En Explorar, comprobar que los lugares se ordenan por cercanía. Abrir una ficha **no** cambia el contador `x/3`.
+- [ ] Caminar hasta menos de 100 m de un ejemplo o de un lugar ajeno: aparece «Llegaste a…» y el contador sube, desde el mapa o con la brújula activa. Probar también **Ya llegué** lejos (explica la distancia) y cerca.
+- [ ] Con menos de 3 visitas, tocar un punto vacío muestra «Punto bloqueado» y Publicar no ofrece pago. En la tercera visita llega «Exploración completada» a Actividad y el punto vacío ya ofrece 1 USD.
+- [ ] Una publicación propia no suma visitas. La pantalla Exploración lista pendientes cercanos y visitados con fecha.
 - [ ] Probar **A la deriva**: prefiere lugares que aún no se abrieron y uno a menos de 10 km si el GPS encuentra alguno. En la ficha, abrir el siguiente hallazgo lleva al lugar más cercano que todavía no se descubrió.
 - [ ] Activar brújula con el teléfono plano: cambia al girarlo y la distancia depende del GPS. Probar también en un ejemplo de SLRC.
 - [ ] Probar texto ampliado y TalkBack/VoiceOver; los botones deben seguir siendo accesibles.

@@ -8,7 +8,7 @@ export type Photo = {
   biometricVerified: boolean;
 };
 export type Position = Coordinate & { accuracy: number; timestamp: string; mocked: boolean };
-export type MapPosition = Coordinate & { accuracy: number | null; timestamp: string };
+export type MapPosition = Coordinate & { accuracy: number | null; timestamp: string; mocked?: boolean };
 export type Place = Coordinate & {
   id: string;
   owner_id: string;
@@ -36,6 +36,9 @@ export type PublishDraft = Coordinate & {
   mode: 'local' | 'remote';
   photo: Photo;
 };
-export type PublicationAccess = { isAdmin: boolean; remoteCredits: number };
+export type PublicationAccess = { isAdmin: boolean; remoteCredits: number; visits: number; requiredVisits: number };
+/** place_key is a deriva_places id or a local example id such as `demo-1`. */
+export type PlaceVisit = { place_key: string; visited_at: string };
+export type VisitResult = { recorded: boolean; visits: number; requiredVisits: number; unlocked: boolean; justUnlocked: boolean };
 export type PublicationInput = Omit<PublishDraft, keyof Coordinate> & Partial<Coordinate>;
 export type ConnectionState = 'preview' | 'connecting' | 'live' | 'offline';

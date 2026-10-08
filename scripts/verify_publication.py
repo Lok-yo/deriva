@@ -85,11 +85,11 @@ with sync_playwright() as p:
                 elif path == '/auth/v1/user' and method == 'GET':
                     payload = session['user']
                 elif path == '/rest/v1/rpc/deriva_get_access' and method == 'POST':
-                    payload = {'is_admin': role == 'admin', 'remote_credits': 0}
+                    payload = {'is_admin': role == 'admin', 'remote_credits': 0, 'visits': 0 if role == 'normal' else 3, 'required_visits': 3}
                 elif path == '/rest/v1/deriva_profiles' and method == 'GET':
                     payload = [{'user_id': fixture_uid, 'display_name': 'Deriva UI Fixture', 'created_at': '2026-10-04T00:00:00Z'}]
                 elif path in ['/rest/v1/deriva_places', '/rest/v1/deriva_saved_places', '/rest/v1/deriva_notifications',
-                              '/rest/v1/deriva_notification_preferences'] and method == 'GET':
+                              '/rest/v1/deriva_notification_preferences', '/rest/v1/deriva_place_visits'] and method == 'GET':
                     payload = []
                 else:
                     known = False
@@ -157,16 +157,26 @@ with sync_playwright() as p:
 
         context, page = context_for()
         page.goto(app_url + remote_path, wait_until='networkidle')
+        expect(page.get_by_text('0/3 lugares visitados', exact=True)).to_be_visible()
+        expect(page.get_by_role('button', name='Ver mi exploración', exact=True)).to_be_visible()
+        expect(page.get_by_role('button', name=re.compile(r'Pagar.*USD'))).to_have_count(0)
+        expect(page.get_by_role('button', name='Publicar lugar', exact=True)).to_have_count(0)
+        page.screenshot(path=str(args.output / 'normal-remote-locked.png'), full_page=True)
+        report['checks'].append('Remote fixture without three visits is locked and offers no payment')
+        context.close()
+
+        context, page = context_for(role='explorer')
+        page.goto(app_url + remote_path, wait_until='networkidle')
         expect(page.get_by_role('button', name='Pagar 1 USD · Prueba', exact=True)).to_be_visible()
-        expect(page.get_by_text('Para agregar una ubicación nueva en este punto debes pagar 1 USD.', exact=True)).to_be_visible()
+        expect(page.get_by_text('Exploración completada · Para agregar una ubicación nueva en este punto debes pagar 1 USD.', exact=True)).to_be_visible()
         expect(page.get_by_text('Stripe en modo de prueba. No se cobran importes reales.', exact=True)).to_be_visible()
         expect(page.get_by_role('button', name='Publicar lugar', exact=True)).to_have_count(0)
         expect(page.get_by_role('button', name='Elegir de galería', exact=True)).to_be_visible()
         page.screenshot(path=str(args.output / 'normal-remote-payment.png'), full_page=True)
-        report['checks'].append('Remote regular fixture displays one USD test payment and no unpaid publication CTA')
+        report['checks'].append('Remote explorer fixture displays one USD test payment and no unpaid publication CTA')
         context.close()
 
-        context, page = context_for(signed_in=False)
+        context, page = context_for(role='explorer', signed_in=False)
         page.goto(app_url + remote_path, wait_until='networkidle')
         page.get_by_role('button', name='Crear cuenta o iniciar sesión', exact=True).click()
         expect(page).to_have_url(re.compile(r'/auth\?'))

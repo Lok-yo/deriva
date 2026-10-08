@@ -4,7 +4,7 @@ El rediseño sigue la petición del usuario: una app móvil sencilla y negra, ce
 
 ## Mapa
 
-Ocupa la pantalla inicial. La marca, el control de ubicación y Al azar flotan sobre la cartografía sin añadir listas o filtros. Los lugares usan pins con `?`. Una selección abre una sola ficha con foto y título; tocar un espacio vacío muestra el precio de 1 USD o el acceso gratuito de administrador. Se conserva la atribución cartográfica.
+Ocupa la pantalla inicial. La marca, el control de ubicación y Al azar flotan sobre la cartografía sin añadir listas o filtros. Los lugares usan pins con `?`. Una selección abre una sola ficha con foto y título; tocar un espacio vacío muestra el precio de 1 USD o el acceso gratuito de administrador; sin las 3 visitas, muestra «Punto bloqueado» con el progreso. El contador `x/3` abre Exploración y un aviso aparece abajo al llegar a un lugar. Se conserva la atribución cartográfica.
 
 No hay botón especial para SLRC. Los ejemplos permanecen en sus coordenadas y el mapa sigue el GPS real al obtener permiso. Mover el mapa suspende el centrado automático; cambios de datos y selección conservan el documento y la cámara.
 
@@ -12,7 +12,7 @@ No hay botón especial para SLRC. Los ejemplos permanecen en sus coordenadas y e
 
 Tres pestañas sin animación lateral: Mapa, Publicar y Perfil. El detalle comienza con Activar GPS y brújula, seguido de título y foto. Las lecturas de sensores son reales, también al explorar ejemplos. Se retiran metadatos, categorías, descripciones y enlaces de navegación externa del detalle.
 
-Publicar aquí presenta título, cámara y GPS, con errores visibles. El modo remoto conserva el punto elegido, permite galería y explica el pago único antes de abrir Stripe. La cuenta admin muestra su excepción sin precio ni checkout. Perfil reúne cuenta, alertas, actividad y publicaciones propias; no muestra Guardados ni Premium.
+Publicar aquí presenta título, cámara y GPS, con errores visibles. El modo remoto conserva el punto elegido, permite galería y explica el pago único antes de abrir Stripe; sin exploración completa no ofrece pago. La ficha indica si ya visitaste el lugar, muestra «Llegaste al lugar» dentro de 100 m y ofrece Ya llegué. La cuenta admin muestra su excepción sin precio ni checkout. Perfil reúne cuenta, alertas, actividad y publicaciones propias; no muestra Guardados ni Premium.
 
 ## Apariencia y accesibilidad
 

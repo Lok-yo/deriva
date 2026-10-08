@@ -65,9 +65,30 @@ test('approximate navigation location does not relax the free publication GPS ru
   const store = createMapLocationStore(async () => ({ position: actualPosition }));
   await store.start();
   assert.equal(store.getSnapshot().status, 'ready');
-  assert.throws(() => validatePublication({ requestId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', title: 'Un parque', mode: 'local', latitude: actualPosition.latitude, longitude: actualPosition.longitude, photo: { uri: 'file:///photo.jpg', source: 'camera', capturedAt: actualPosition.timestamp, biometricVerified: true } }, { isAdmin: false, remoteCredits: 0 }, { ...actualPosition, mocked: false }, Date.parse(actualPosition.timestamp)), /precisión/i);
+  assert.throws(() => validatePublication({ requestId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', title: 'Un parque', mode: 'local', latitude: actualPosition.latitude, longitude: actualPosition.longitude, photo: { uri: 'file:///photo.jpg', source: 'camera', capturedAt: actualPosition.timestamp, biometricVerified: true } }, { isAdmin: false, remoteCredits: 0, visits: 0, requiredVisits: 3 }, { ...actualPosition, mocked: false }, Date.parse(actualPosition.timestamp)), /precisión/i);
 });
 
+test('following the phone starts only after a successful read and stops cleanly', async () => {
+  let emit: ((position: typeof actualPosition) => void) | null = null;
+  let watches = 0, removed = 0;
+  const watch = async (onPosition: (position: typeof actualPosition) => void) => { watches++; emit = onPosition; return () => { removed++; }; };
+  const denied = createMapLocationStore(async () => ({ status: 'denied', error: 'Sin permiso', canAskAgain: true }), watch);
+  await denied.start();
+  denied.follow()();
+  assert.equal(watches, 0);
+
+  const store = createMapLocationStore(async () => ({ position: actualPosition }), watch);
+  await store.start();
+  const stop = store.follow();
+  await Promise.resolve();
+  const moved = { ...actualPosition, latitude: 29.08, accuracy: 8 };
+  emit!(moved);
+  assert.deepEqual(store.getSnapshot().position, moved);
+  stop();
+  assert.equal(removed, 1);
+  emit!({ ...moved, latitude: 30 });
+  assert.equal(store.getSnapshot().position?.latitude, 29.08);
+});
 test('GPS center wins over distant demo markers and stays stable during selection/feed changes', () => {
   const initial = mapUpdate({ center: actualPosition, origin: actualPosition, places: previewPlaces });
   const selected = mapUpdate({ center: actualPosition, origin: actualPosition, places: [...previewPlaces].reverse(), selectedId: previewPlaces[0].id });

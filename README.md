@@ -49,7 +49,7 @@ El mapa pide la ubicación en primer plano y se centra en el GPS. Si el permiso 
 | Flujo | Fotografía | Ubicación | Precio |
 | --- | --- | --- | --- |
 | Publicar aquí | Cámara, después de biometría | GPS actual | Gratis |
-| Tocar un punto vacío | Cámara o galería | El punto elegido | 1 USD por publicación |
+| Tocar un punto vacío, después de visitar 3 lugares | Cámara o galería | El punto elegido | 1 USD por publicación |
 | Cuenta con rol de administrador | Cámara o galería | El punto elegido | Gratis |
 
 Una publicación necesita un título de 3 a 80 caracteres y una fotografía. El rol de administrador se asigna en el servidor. La app no permite concedérselo desde el perfil.
@@ -58,7 +58,11 @@ El pago remoto está en modo de prueba. Checkout se abre en el navegador y solo 
 
 La ficha de un lugar muestra la foto, el título y, arriba, **Activar GPS y brújula**. No se guardan datos biométricos. Hay seis lugares de ejemplo en San Luis Río Colorado: viven en la app, no en la base de datos, y no sustituyen el GPS.
 
-En **Explorar**, el mapa ordena una lista horizontal por cercanía cuando hay GPS. **A la deriva** prefiere un lugar que aún no hayas abierto y, con GPS, uno a menos de 10 km si hay alguno. Abrir la ficha cuenta como descubrimiento; el progreso se guarda solo en ese teléfono y la ficha propone el siguiente lugar cercano sin descubrir.
+En **Explorar**, el mapa ordena una lista horizontal por cercanía cuando hay GPS. **A la deriva** prefiere un lugar que aún no hayas visitado y, con GPS, uno a menos de 10 km si hay alguno.
+
+Abrir una ficha ya no cuenta. Una visita se registra cuando llegas en persona a menos de 100 m de un lugar, con una lectura de GPS real, de 100 m de precisión o mejor y de menos de dos minutos. Ocurre sola mientras el mapa o la brújula siguen tu posición, o al tocar **Ya llegué** en la ficha. Cuentan los lugares de otras personas y los seis ejemplos de SLRC; tus publicaciones no. Las visitas se guardan en Supabase por cuenta y sobreviven aunque el lugar se borre.
+
+El contador del mapa muestra `x/3`. Al completar 3 visitas se desbloquean las ubicaciones de pago en cualquier punto del mapa, llega un aviso a Actividad y el contador pasa a mostrar el total. La pantalla **Exploración** (desde el contador o Perfil) explica las reglas, propone los lugares pendientes más cercanos y lista los visitados. Los administradores no necesitan visitas.
 
 Las cuentas pueden activar avisos de lugares cercanos. El radio por defecto es 10 km y se puede ajustar a 1, 5, 10, 25 o 50 km. El centro queda fijo al guardar la zona.
 
