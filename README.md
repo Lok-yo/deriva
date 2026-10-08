@@ -25,7 +25,7 @@ En Android, Expo Go muestra el mapa con Leaflet y OpenStreetMap dentro de un Web
 
 ## APK para el celular
 
-El perfil `preview` de `eas.json` genera un APK instalable. No es un paquete para Play Store. En Android usa el mapa nativo.
+El perfil `preview` de `eas.json` genera un APK instalable. No es un paquete para Play Store. En Android usa el mismo mapa de OpenStreetMap que Expo Go: el mapa nativo de Android es Google Maps y, sin API key, cierra la app al abrirse. Para usarlo, define `GOOGLE_MAPS_ANDROID_API_KEY` en el entorno de EAS y vuelve a compilar.
 
 ```bash
 npx eas-cli@latest login

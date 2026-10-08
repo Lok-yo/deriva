@@ -1,5 +1,7 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
+const androidMapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Deriva', slug: 'deriva', version: '1.0.0', scheme: 'deriva',
@@ -20,9 +22,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ['expo-location', { locationWhenInUsePermission: 'Deriva usa tu ubicación mientras exploras para encontrar lugares cercanos y publicar donde estás.' }],
     ['expo-sensors', { motionPermission: 'Deriva usa el magnetómetro para orientar la brújula hacia el lugar que elegiste.' }],
     ['expo-notifications', { color: '#C5ED95', defaultChannel: 'nearby' }],
+    ...(androidMapsKey ? [['react-native-maps', { androidGoogleMapsApiKey: androidMapsKey }] as [string, object]] : []),
   ],
   extra: {
     ...config.extra,
+    androidNativeMap: !!androidMapsKey,
     eas: {
       ...config.extra?.eas,
       ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID } : {}),

@@ -15,7 +15,7 @@ const darkMap = [
   { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#253D2C' }] },
 ];
 
-/** iOS and development builds; Android Expo Go uses EmbeddedMapView. */
+/** iOS, and Android only when the binary carries a Google Maps key. */
 export function NativeMapView(props: MapProps) {
   const map = useRef<NativeMap>(null);
   const [ready, setReady] = useState(false);
